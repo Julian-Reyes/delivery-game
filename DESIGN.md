@@ -8,7 +8,7 @@ change that makes it wrong.
 | Step | What                                                         | State   |
 | ---- | ------------------------------------------------------------ | ------- |
 | 1    | Scaffold, scripts, docs, `brand.ts`                          | Done    |
-| 2    | Core loop, renderer with perf caps, debug overlay, input     | Pending |
+| 2    | Core loop, renderer with perf caps, debug overlay, input     | Done    |
 | 3    | Cargo and pay pure functions with tests                      | Pending |
 | 4    | Neighborhood, lighting, fog, colliders                       | Pending |
 | 5    | Bike controller, wheelie, crash and respawn, camera          | Pending |

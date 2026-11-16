@@ -29,8 +29,8 @@ All of these must pass before every commit.
 - **No real landmarks** or real business likenesses in the world.
 - **Dependencies:** adding a dependency or changing the structure in `DESIGN.md` needs the
   owner's approval first. Stop and ask.
-- **Git:** small commits with clear messages, game playable after each. Never add a remote
-  and never push.
+- **Git:** small commits with clear messages, game playable after each. Push to `origin`
+  (github.com/Julian-Reyes/delivery-game) after every commit. Never force-push.
 - **TypeScript 6.x:** stay on 6.x until typescript-eslint supports 7.
 
 ## Architecture rules
