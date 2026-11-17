@@ -3,7 +3,7 @@
  * game code never sees device events.
  */
 
-export const BUTTONS = ['confirm', 'pause', 'respawn', 'toggleDebug'] as const;
+export const BUTTONS = ['confirm', 'pause', 'respawn', 'toggleDebug', 'toggleMap'] as const;
 export type ButtonAction = (typeof BUTTONS)[number];
 
 export interface RawInput {
@@ -28,7 +28,13 @@ export function createRawInput(): RawInput {
     throttle: 0,
     brake: 0,
     steer: 0,
-    buttons: { confirm: false, pause: false, respawn: false, toggleDebug: false },
+    buttons: {
+      confirm: false,
+      pause: false,
+      respawn: false,
+      toggleDebug: false,
+      toggleMap: false,
+    },
   };
 }
 

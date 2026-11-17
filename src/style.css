@@ -132,3 +132,54 @@ body,
   color: #fff;
   z-index: 20;
 }
+
+.debug-map {
+  position: absolute;
+  inset: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+    max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #12202c;
+  box-shadow: 0 6px 30px rgb(0 0 0 / 50%);
+  z-index: 15;
+}
+
+.debug-map[hidden] {
+  display: none;
+}
+
+.debug-map canvas {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.debug-map-legend {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 70%);
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.debug-map-legend span {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.debug-map-legend i {
+  display: inline-block;
+  width: 1.1rem;
+  height: 0.7rem;
+  box-sizing: border-box;
+}

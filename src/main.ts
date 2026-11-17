@@ -8,9 +8,18 @@ import { GamepadSource } from './input/gamepad';
 import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
-import { SPAWN } from './world/layout';
+import { DebugMap } from './ui/debugMap';
+import { HALF, SPAWN, heightAt } from './world/layout';
+import { DEFAULT_MAP_SEED, buildRoadNetwork } from './world/roads/network';
+import { validateGraph } from './world/roads/validate';
 import { World } from './world/world';
 import './style.css';
+
+/** `?seed=123` in the address reproduces a particular generated layout. */
+function mapSeed(): number {
+  const value = Number(new URLSearchParams(window.location.search).get('seed'));
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAP_SEED;
+}
 
 function buildTitleCard(): HTMLElement {
   // Placeholder title card. The real title screen arrives with the delivery loop.
@@ -50,6 +59,18 @@ async function boot(): Promise<void> {
   input.addSource(new KeyboardSource());
   input.addSource(new GamepadSource());
 
+  const seed = mapSeed();
+  const roads = buildRoadNetwork(seed);
+  const roadIssues = validateGraph(roads, SPAWN.x, SPAWN.z);
+  if (roadIssues.length > 0) console.warn(`Road layout (seed ${seed}):`, roadIssues);
+  const map = new DebugMap(
+    app,
+    roads,
+    heightAt,
+    { x0: -HALF, x1: HALF, z0: -HALF, z1: HALF },
+    roadIssues,
+  );
+
   const physics = await Physics.create();
   const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   const world = new World(physics, anisotropy);
@@ -60,7 +81,8 @@ async function boot(): Promise<void> {
 
   const hint = document.createElement('p');
   hint.className = 'hint';
-  hint.textContent = 'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · ` debug';
+  hint.textContent =
+    'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · M map · ` debug';
   hint.hidden = true;
 
   const titleCard = buildTitleCard();
@@ -77,7 +99,7 @@ async function boot(): Promise<void> {
 
   if (import.meta.env.DEV) {
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
-    Object.assign(window, { __game: { rider, chase, world } });
+    Object.assign(window, { __game: { rider, chase, world, roads } });
   }
 
   let frameDt = 0;
@@ -86,6 +108,7 @@ async function boot(): Promise<void> {
       frameDt = dt;
       input.poll();
       if (input.wasPressed('toggleDebug')) overlay.toggle();
+      if (input.wasPressed('toggleMap')) map.toggle();
       if (input.wasPressed('confirm')) startRiding();
       if (riding && input.wasPressed('respawn')) {
         rider.respawn();
@@ -101,6 +124,7 @@ async function boot(): Promise<void> {
       const eye = chase.camera.position;
       world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);
       renderer.render(world.scene, chase.camera);
+      map.update(rider.pose.x, rider.pose.z, rider.pose.heading);
     },
     stats(frameMs, cpuMs): void {
       overlay.record(frameMs, cpuMs);

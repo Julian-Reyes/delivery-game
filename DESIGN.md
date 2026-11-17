@@ -13,6 +13,7 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 | 1    | Scaffold, scripts, docs, `brand.ts`                          | Done    |
 | 2    | Core loop, renderer with perf caps, debug overlay, input     | Done    |
 | 4    | Neighborhood, lighting, fog, colliders                       | Done    |
+| 4b   | Map expansion: hillside favela, Niemeyer, Vidigal (layout)   | Started |
 | 3    | Cargo and pay pure functions with tests                      | Pending |
 | 5    | Bike controller, wheelie, crash and respawn, camera          | Partial |
 | 6    | Delivery loop: title, order picker, waypoint, HUD, results   | Pending |
@@ -91,6 +92,58 @@ Known gaps: the city is one merged mesh, so nothing is frustum-culled (split it 
 triangle count becomes a problem on phones); ramps can be ridden into from behind; poles
 and trees have no colliders.
 
+## Map expansion (step 4b)
+
+The owner asked for two favela areas added to the same continuous world, structure first:
+plain blocks, no texturing or detail until both layouts play well. Real Rio district and
+street names are allowed for these (owner's decision); real landmarks and businesses still
+are not.
+
+- **Area 1, hillside (first):** behind the top of the city, x about −200..200, z 150..560.
+  The ground rises from the top terrace (28 m) to a ridge at about 130 m. A hand-drawn main
+  road climbs it in switchback legs and comes back down, entering the city at the x = −30
+  and x = 90 hill streets; a stair climbs from the x = 30 street. Secondary streets, lanes,
+  alleys, stairs and dead ends are generated from a seed off the main roads.
+- **Area 2, Avenida Niemeyer and Vidigal (second):** the west tunnel mouth becomes a winding
+  cliff road along the coast, with one entrance to Vidigal and its steep main road climbing
+  a headland. A ridge keeps it apart from Area 1.
+- **Edges:** steep wooded slopes with walls hidden in them, backdrop hills further out, fog.
+
+Order of work: road graph and debug map (done), terrain system and extended world, Area 1
+main roads, Area 1 small streets, Area 1 buildings and delivery spots, then Area 2.
+
+### Road graph
+
+`src/world/roads/` is the source of truth for where you can ride and walk, pure and unit-
+tested. Nodes are junctions and dead ends; edges carry the full centreline with heights, a
+kind, a width, a surface and an area. The original city is mirrored into it from
+`layout.ts` (a test checks they agree). `buildRoadNetwork(seed)` builds the whole network;
+`?seed=N` in the address picks a layout.
+
+| Kind      | Width | Max grade | Min radius | Bike |
+| --------- | ----- | --------- | ---------- | ---- |
+| avenue    | 15 m  | 2%        | 40 m       | yes  |
+| street    | 10 m  | 36%       | 20 m       | yes  |
+| main      | 7 m   | 12%       | 10 m       | yes  |
+| secondary | 5 m   | 18%       | 7 m        | yes  |
+| lane      | 3 m   | 25%       | 4.5 m      | yes  |
+| alley     | 2 m   | 25%       | 4.5 m      | yes  |
+| stairs    | 2 m   | any       | –          | no   |
+
+The city's grid streets keep their steep straight climbs (up to 35%). Everything new winds.
+
+The bike can't reverse and turns no tighter than about 3.7 m radius, so the validator
+(`validate.ts`) checks turns as the bike would ride them: a corner is passable if the line
+from outside edge to inside corner and back has enough radius. It reports grades and curves
+beyond each kind's limit, roads running into each other except at junctions (bridges more
+than 4 m apart vertically are fine), dead ends without a turning pad, edges the bike can't
+reach from the spawn, and edges it can enter but never leave. `route.ts` finds the shortest
+riding or walking route, for delivery distances and the waypoint later.
+
+**M** shows the debug map: relief and 5 m contours, roads coloured by area, pedestrian routes
+dashed, rings where areas meet, red crosses on validation problems, and the rider. Scroll to
+zoom, drag to pan, double-click to reset.
+
 ## Tech
 
 - three.js, TypeScript (strict), Vite. No UI framework; HUD and menus are DOM/CSS.
@@ -110,9 +163,10 @@ src/
   physics/     Rapier world, colliders, queries
   bike/        controller, bike mesh, camera rig
   world/       neighborhood layout, merged geometry, lighting, fog
+    roads/     road graph, city streets, validation, routing (pure, tested)
   traffic/     routes, vehicles (instanced)
   game/        delivery state machine, session earnings
-  ui/          title, order picker, HUD, results (DOM)
+  ui/          title, order picker, HUD, results, debug map (DOM)
   audio/       synthesized placeholder sounds
 ```
 
@@ -157,7 +211,8 @@ Heavy cargo carries handling modifiers in its spec that the bike controller read
 
 ## Decisions
 
-- Fictional hillside neighborhood in the spirit of Rio; no real landmarks.
+- Fictional hillside neighborhood in the spirit of Rio; no real landmarks. The expansion may
+  use real district and street names (owner's decision).
 - Touch layout: steer buttons on one side, throttle and brake on the other. Tilt steering
   later.
 - UI text in English, pay in R$.

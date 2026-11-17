@@ -11,6 +11,7 @@ const BUTTON_KEYS: Record<ButtonAction, readonly string[]> = {
   respawn: ['KeyR'],
   // Backquote as well because F3 is taken by the OS on many laptops.
   toggleDebug: ['F3', 'Backquote'],
+  toggleMap: ['KeyM'],
 };
 
 const HANDLED = new Set<string>([
@@ -23,6 +24,8 @@ const HANDLED = new Set<string>([
 
 export class KeyboardSource implements InputSource {
   private readonly down = new Set<string>();
+  /** Keys pressed since the last read, so a tap shorter than a frame still counts once. */
+  private readonly tapped = new Set<string>();
 
   constructor(private readonly target: Window = window) {
     target.addEventListener('keydown', this.onKeyDown);
@@ -38,6 +41,8 @@ export class KeyboardSource implements InputSource {
     out.buttons.pause = this.any(BUTTON_KEYS.pause);
     out.buttons.respawn = this.any(BUTTON_KEYS.respawn);
     out.buttons.toggleDebug = this.any(BUTTON_KEYS.toggleDebug);
+    out.buttons.toggleMap = this.any(BUTTON_KEYS.toggleMap);
+    this.tapped.clear();
   }
 
   dispose(): void {
@@ -48,7 +53,7 @@ export class KeyboardSource implements InputSource {
   }
 
   private any(codes: readonly string[]): boolean {
-    for (const code of codes) if (this.down.has(code)) return true;
+    for (const code of codes) if (this.down.has(code) || this.tapped.has(code)) return true;
     return false;
   }
 
@@ -58,6 +63,7 @@ export class KeyboardSource implements InputSource {
     if (!HANDLED.has(event.code)) return;
     event.preventDefault();
     this.down.add(event.code);
+    this.tapped.add(event.code);
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
@@ -67,5 +73,6 @@ export class KeyboardSource implements InputSource {
   // Keyup never arrives if focus leaves mid-press, which would leave the throttle stuck.
   private readonly onBlur = (): void => {
     this.down.clear();
+    this.tapped.clear();
   };
 }

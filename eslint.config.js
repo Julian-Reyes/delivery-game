@@ -19,8 +19,9 @@ export default tseslint.config(
     },
   },
   {
-    // The simulation layer must stay pure: no rendering, physics engine or DOM code.
-    files: ['src/sim/**/*.ts'],
+    // The simulation layer and the map data must stay pure: no rendering, physics engine or
+    // DOM code.
+    files: ['src/sim/**/*.ts', 'src/world/layout.ts', 'src/world/roads/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -28,7 +29,8 @@ export default tseslint.config(
           patterns: [
             {
               group: ['three', 'three/*', '@dimforge/*'],
-              message: 'src/sim is pure game logic. Keep rendering and physics imports out of it.',
+              message:
+                'This is pure game logic or map data. Keep rendering and physics imports out of it.',
             },
           ],
         },

@@ -26,7 +26,8 @@ All of these must pass before every commit.
 - **Assets:** only free assets that allow commercial use (CC0 preferred). Record creator,
   license and source URL in `CREDITS.md` in the same commit. Never guess a credit. If a
   license is unclear, make a placeholder in code instead.
-- **No real landmarks** or real business likenesses in the world.
+- **No real landmarks** or real business likenesses in the world. Real Rio district and street
+  names (Leblon, Avenida Niemeyer, Vidigal) are allowed in the map, approved by the owner.
 - **Dependencies:** adding a dependency or changing the structure in `DESIGN.md` needs the
   owner's approval first. Stop and ask.
 - **Git:** small commits with clear messages, game playable after each. Push to `origin`
@@ -43,8 +44,10 @@ All of these must pass before every commit.
 - The simulation runs at a fixed 60 Hz step; rendering interpolates. Do not put gameplay
   logic in per-frame render code.
 - HUD and menus are plain DOM/CSS over the canvas. No UI framework.
-- `src/world/layout.ts` is the source of truth for the map (streets, heights, surfaces). It
-  stays pure like `src/sim/`. Change the map there, not in the mesh builders.
+- `src/world/layout.ts` is the source of truth for the original city grid (heights, surfaces).
+  The road graph in `src/world/roads/` is the source of truth for navigation and routing
+  across the whole map. Both stay pure like `src/sim/` (ESLint enforces it). Change the map
+  there, not in the mesh builders, and keep `validateGraph` returning no issues.
 - All static scenery goes through `GeoBuilder` into a shared merged mesh. Do not add
   individual `Mesh` objects for static things.
 - Shop names and signs are invented and generic. Never a real business or brand.
