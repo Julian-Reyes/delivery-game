@@ -5,9 +5,9 @@ import type { Surface } from '../world/layout';
 import type { RoadGraph, RoadKind } from '../world/roads/graph';
 
 /**
- * The minimap, bottom left, in the style of the radar in open-world crime games: a dark,
- * muted map with bright roads, turned so straight ahead is always up, the bike a little
- * below the middle so more of the road ahead shows, zooming out with speed.
+ * The minimap, bottom left, in the style of the radar in open-world crime games: a round,
+ * dark, muted map with bright roads, turned so straight ahead is always up, the bike in
+ * the middle, zooming out with speed.
  *
  * Inside the city the ground is painted from the layout itself, so every street has its
  * real width (the four-lane seafront avenue is half again as wide as the side streets,
@@ -43,8 +43,8 @@ const PIXELS_PER_METRE = 2;
 const NEAR_RANGE = 75;
 const FAR_RANGE = 150;
 const TOP_SPEED = 28;
-/** The bike sits this far down the map, so more of what is ahead shows. */
-const BIKE_DOWN = 0.64;
+/** The bike sits in the middle of the round map. */
+const BIKE_DOWN = 0.5;
 const TERRAIN_SAMPLE = 2;
 
 type Rgb = readonly [number, number, number];
@@ -206,18 +206,11 @@ export class Minimap {
     }
     context.restore();
 
-    // North rides the edge of the map where a line due north from the bike meets it.
-    const dirX = Math.sin(heading);
-    const dirY = -Math.cos(heading);
-    const inset = 10;
-    const bx = rect.width / 2;
-    const by = rect.height * BIKE_DOWN;
-    const tx =
-      dirX > 0 ? (rect.width - inset - bx) / dirX : dirX < 0 ? (inset - bx) / dirX : Infinity;
-    const ty =
-      dirY > 0 ? (rect.height - inset - by) / dirY : dirY < 0 ? (inset - by) / dirY : Infinity;
-    const t = Math.min(tx, ty);
-    this.north.style.transform = `translate(${bx + dirX * t}px, ${by + dirY * t}px) translate(-50%, -50%)`;
+    // North rides the rim, due north of the bike in the middle.
+    const rim = rect.width / 2 - 11;
+    const northX = rect.width / 2 + Math.sin(heading) * rim;
+    const northY = rect.height / 2 - Math.cos(heading) * rim;
+    this.north.style.transform = `translate(${northX}px, ${northY}px) translate(-50%, -50%)`;
   }
 }
 

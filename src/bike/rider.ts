@@ -14,8 +14,10 @@ const ACCEL = 14;
 const BRAKE = 26;
 const DRAG = 0.6;
 const MAX_SPEED = 28;
-const TURN_RATE = 1.9;
-const MAX_LEAN = 0.55;
+const TURN_RATE = 2.5;
+const MAX_LEAN = 0.7;
+/** Below this speed steering fades out, so the bike cannot spin on the spot. */
+const FULL_STEER_SPEED = 4.5;
 const GRAVITY = 22;
 /** How far below the predicted path the ground can be before we count as airborne. */
 const STICK = 0.06;
@@ -172,7 +174,7 @@ export class Rider {
     // the turned front wheel swings the bike the other way, and only slowly.
     const grip =
       this.speed >= 0
-        ? Math.min(1, this.speed / 6) * (this.grounded ? 1 : AIR_STEER)
+        ? Math.min(1, this.speed / FULL_STEER_SPEED) * (this.grounded ? 1 : AIR_STEER)
         : -REVERSE_STEER * (-this.speed / REVERSE_SPEED);
     this.heading -= input.steer * TURN_RATE * grip * dt;
 

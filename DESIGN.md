@@ -21,7 +21,9 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 | 8    | Touch controls, placeholder sounds, performance pass, report | Pending |
 
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
-terrain following, airtime off ramps and crests, sliding along walls, and backing up: hold
+terrain following, tighter steering (2.5 rad/s once above 4.5 m/s, fading out below, so
+the tightest circle is about 1.8 m at walking pace and v / 2.5 above), airtime off ramps
+and crests, sliding along walls, and backing up: hold
 the brake at a standstill and after 0.35 s the rider paddles the bike backwards with their
 feet at 1.6 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
 go. It also publishes `telemetry` (speed, throttle, brake, airtime, landings, scraping)
@@ -296,8 +298,7 @@ reach from the spawn, and edges it can enter but never leave. `route.ts` finds t
 riding or walking route, for delivery distances and the waypoint later.
 
 **Minimap** (`ui/minimap.ts`), bottom left while riding, in the style of an open-world
-radar: a rounded rectangle, heading-up, the bike's white arrow below the middle so more
-of the road ahead shows, zooming out from 75 m to 150 m ahead with speed, an N riding the
+radar: round, heading-up, the bike's white arrow in the middle, zooming out from 75 m to 150 m ahead with speed, an N riding the
 edge, and pickups and drop-offs as round blips. Inside the city the ground is painted
 pixel by pixel from `surfaceAt`, so every street has its true width: the 15 m four-lane
 seafront avenue in bright cream with its double yellow line and lane dashes, the 10 m side
