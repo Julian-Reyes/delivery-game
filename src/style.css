@@ -121,3 +121,14 @@ body,
   pointer-events: none;
   z-index: 10;
 }
+
+.boot-error {
+  position: absolute;
+  inset: auto 1rem 1rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #7a1f1f;
+  color: #fff;
+  z-index: 20;
+}

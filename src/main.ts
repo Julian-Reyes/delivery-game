@@ -1,3 +1,5 @@
+import { ChaseCamera } from './bike/chaseCamera';
+import { Rider } from './bike/rider';
 import { BRAND } from './brand';
 import { DebugOverlay } from './core/debugOverlay';
 import { createLoop } from './core/loop';
@@ -5,11 +7,13 @@ import { createRenderer } from './core/renderer';
 import { GamepadSource } from './input/gamepad';
 import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
-import { Sandbox } from './sandbox';
+import { Physics } from './physics/physics';
+import { SPAWN } from './world/layout';
+import { World } from './world/world';
 import './style.css';
 
 function buildTitleCard(): HTMLElement {
-  // Placeholder title card. The real title screen arrives with the delivery loop (step 6).
+  // Placeholder title card. The real title screen arrives with the delivery loop.
   const card = document.createElement('main');
   card.className = 'title-card';
 
@@ -32,7 +36,7 @@ function buildTitleCard(): HTMLElement {
   return card;
 }
 
-function boot(): void {
+async function boot(): Promise<void> {
   document.title = BRAND.gameName;
 
   const app = document.querySelector<HTMLDivElement>('#app');
@@ -46,12 +50,17 @@ function boot(): void {
   input.addSource(new KeyboardSource());
   input.addSource(new GamepadSource());
 
-  const sandbox = new Sandbox();
-  view.onResize((width, height) => sandbox.setAspect(width / height));
+  const physics = await Physics.create();
+  const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  const world = new World(physics, anisotropy);
+  const rider = new Rider(physics, SPAWN);
+  world.scene.add(rider.object);
+  const chase = new ChaseCamera(physics);
+  view.onResize((width, height) => chase.setAspect(width / height));
 
   const hint = document.createElement('p');
   hint.className = 'hint';
-  hint.textContent = 'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · ` or F3 debug';
+  hint.textContent = 'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · ` debug';
   hint.hidden = true;
 
   const titleCard = buildTitleCard();
@@ -66,18 +75,32 @@ function boot(): void {
   };
   titleCard.addEventListener('pointerdown', startRiding);
 
+  if (import.meta.env.DEV) {
+    // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
+    Object.assign(window, { __game: { rider, chase, world } });
+  }
+
+  let frameDt = 0;
   const loop = createLoop({
-    frame(): void {
+    frame(dt): void {
+      frameDt = dt;
       input.poll();
       if (input.wasPressed('toggleDebug')) overlay.toggle();
       if (input.wasPressed('confirm')) startRiding();
+      if (riding && input.wasPressed('respawn')) {
+        rider.respawn();
+        chase.snap();
+      }
     },
     step(dt): void {
-      if (riding) sandbox.step(dt, input.state);
+      if (riding) rider.step(dt, input.state);
     },
     render(alpha): void {
-      sandbox.render(alpha);
-      renderer.render(sandbox.scene, sandbox.camera);
+      rider.render(alpha);
+      chase.update(frameDt, rider.pose);
+      const eye = chase.camera.position;
+      world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);
+      renderer.render(world.scene, chase.camera);
     },
     stats(frameMs, cpuMs): void {
       overlay.record(frameMs, cpuMs);
@@ -86,4 +109,10 @@ function boot(): void {
   loop.start();
 }
 
-boot();
+boot().catch((error: unknown) => {
+  console.error(error);
+  const message = document.createElement('p');
+  message.className = 'boot-error';
+  message.textContent = 'The game could not start. See the browser console for details.';
+  document.body.append(message);
+});

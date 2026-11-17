@@ -43,6 +43,13 @@ All of these must pass before every commit.
 - The simulation runs at a fixed 60 Hz step; rendering interpolates. Do not put gameplay
   logic in per-frame render code.
 - HUD and menus are plain DOM/CSS over the canvas. No UI framework.
+- `src/world/layout.ts` is the source of truth for the map (streets, heights, surfaces). It
+  stays pure like `src/sim/`. Change the map there, not in the mesh builders.
+- All static scenery goes through `GeoBuilder` into a shared merged mesh. Do not add
+  individual `Mesh` objects for static things.
+- Shop names and signs are invented and generic. Never a real business or brand.
+- In dev builds `window.__game` exposes the rider, camera and world; `__game.rider.teleport(x, z, heading)`
+  is handy for checking a spot.
 - Tuning numbers live in `src/sim/tuning.ts`, not scattered through the code.
 - User-facing text is English for now; keep strings together so translation is easy later.
 
