@@ -177,6 +177,7 @@ async function boot(): Promise<void> {
     },
     render(alpha): void {
       rider.render(alpha);
+      world.animate(frameDt);
       chase.update(frameDt, rider.pose);
       const camera = free && flying ? free.camera : chase.camera;
       const eye = camera.position;

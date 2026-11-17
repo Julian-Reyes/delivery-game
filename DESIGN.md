@@ -226,8 +226,18 @@ cables between them and drops to nearby houses; cars parked along main and secon
 roads (with colliders, never at junctions or in bends); and about 130 parked motorbikes,
 many with a delivery box, as one instanced mesh. The favela ground is bare earth.
 
-With the favela in view: about 27 draw calls, 260k triangles and 1 ms of CPU per frame on
-a desktop. Triangles are the cost to watch on phones; the walls could be split by chunk
+**Life** (`favelaLife.ts`): about 130 people walk the streets and stairs (at the road edge,
+out of the bike's way, or anywhere across a stair), turning onto another street at each
+corner; others stand at their doors or sit at plastic tables outside nine corner bars.
+Each body part (torso and arms, head, legs) is one instanced mesh, so the crowd is three
+draw calls; legs swing as they walk. Washing hangs on lines across lanes between houses
+facing each other and on rooftop lines; twelve kites sway high over the hill on long
+strings; trees grow in open patches; pot plants by doors and on roofs; air conditioners
+under windows; satellite dishes; murals on some side walls (a facade tile left
+untinted). People and kites are scenery animated per frame, with no collisions yet.
+
+With the favela in view: about 35–42 draw calls, 260–375k triangles and 1 ms of CPU per
+frame on a desktop. Triangles are the cost to watch on phones; the walls could be split by chunk
 for culling if needed.
 
 Delivery spots (`DeliverySpot`): four pickups at shops on the main roads, spread 90 m

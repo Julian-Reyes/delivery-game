@@ -35,6 +35,7 @@ import {
 } from './props';
 import type { SolidBox } from './props';
 import { createFacadeAtlas } from './facades';
+import { FavelaLife } from './favelaLife';
 import { addFavelaProps } from './favelaProps';
 import { addHouses } from './houseMesh';
 import type { HousePlan } from './houses';
@@ -143,6 +144,7 @@ export class World {
   private readonly sun = new DirectionalLight(0xfff1dc, 2.4);
   private readonly sky = createSky();
   private readonly fog = new Fog(SKY_HORIZON, 70, 520);
+  private readonly life: FavelaLife;
 
   constructor(
     physics: Physics,
@@ -195,6 +197,17 @@ export class World {
     const facades = new GeoBuilder(true);
     addHouses(facades, city, wires, solids, favela.houses, favela.spots);
     const favelaProps = addFavelaProps(city, wires, solids, roads, favela.houses, 'hillside', seed);
+    this.life = new FavelaLife(
+      scene,
+      city,
+      wires,
+      roads,
+      favela.houses,
+      favela.spots,
+      terrain,
+      'hillside',
+      seed,
+    );
 
     // Ground: one mesh per surface texture.
     const textures = createGroundTextures(anisotropy);
@@ -286,6 +299,11 @@ export class World {
     }
     for (const s of solids) physics.addSolidBox(s.x, s.y, s.z, s.hx, s.hy, s.hz, s.yaw);
     physics.commit();
+  }
+
+  /** Animate the scenery that moves: people and kites. Call once per rendered frame. */
+  animate(dt: number): void {
+    this.life.animate(dt);
   }
 
   /** Fog hides the map edges while riding; the free camera turns it off to see the layout. */

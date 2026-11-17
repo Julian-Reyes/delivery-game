@@ -9,10 +9,18 @@ import { createRandom } from './random';
  * house's vertex colour tints them; brick keeps its own colour.
  */
 
-export type Feature = 'blank' | 'grille' | 'shutters' | 'small' | 'door' | 'roller';
+export type Feature = 'blank' | 'grille' | 'shutters' | 'small' | 'door' | 'roller' | 'mural';
 
 const FINISHES: readonly Finish[] = ['brick', 'block', 'plaster'];
-const FEATURES: readonly Feature[] = ['blank', 'grille', 'shutters', 'small', 'door', 'roller'];
+const FEATURES: readonly Feature[] = [
+  'blank',
+  'grille',
+  'shutters',
+  'small',
+  'door',
+  'roller',
+  'mural',
+];
 const TILE = 128;
 /** Unpainted margin round each tile, so mipmaps do not bleed one tile into the next. */
 const GUTTER = 4;
@@ -149,6 +157,41 @@ function feature(
       ctx.fillRect(x + 4, y + 42, w - 8, 34);
       ctx.fillStyle = '#c8b46a';
       ctx.fillRect(x + w - 9, y + 44, 4, 4);
+      return;
+    }
+    case 'mural': {
+      // Painted straight over the wall: bands of colour, a sun, a few wild strokes. Drawn
+      // untinted, so the house colour does not dull it.
+      const palette = ['#f2c14e', '#e8553b', '#2a9d8f', '#3b82f6', '#9b5de5', '#f15bb5', '#00bb6d'];
+      const band = (y: number, h: number): void => {
+        ctx.fillStyle = palette[Math.floor(random() * palette.length)] ?? '#f2c14e';
+        ctx.beginPath();
+        ctx.moveTo(x0, y);
+        for (let x = 0; x <= TILE; x += 16) ctx.lineTo(x0 + x, y + Math.sin(x / 18 + y) * 8);
+        ctx.lineTo(x0 + TILE, y + h);
+        ctx.lineTo(x0, y + h);
+        ctx.fill();
+      };
+      band(y0 + 70, 60);
+      band(y0 + 96, 40);
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.arc(x0 + 30 + random() * 60, y0 + 38, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = palette[Math.floor(random() * palette.length)] ?? '#e8553b';
+        ctx.beginPath();
+        ctx.moveTo(x0 + random() * TILE, y0 + 20 + random() * 90);
+        ctx.quadraticCurveTo(
+          x0 + random() * TILE,
+          y0 + random() * TILE,
+          x0 + random() * TILE,
+          y0 + 20 + random() * 90,
+        );
+        ctx.stroke();
+      }
       return;
     }
     case 'roller': {

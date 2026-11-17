@@ -45,7 +45,11 @@ function featureFor(
   const roll = random();
   if (wall === 'front')
     return roll < 0.45 ? 'grille' : roll < 0.75 ? 'shutters' : roll < 0.88 ? 'small' : 'blank';
-  if (wall === 'side') return roll < 0.5 ? 'blank' : roll < 0.75 ? 'small' : 'grille';
+  if (wall === 'side') {
+    // Now and then a mural on the low part of a side wall.
+    if (floor < 2 && roll < 0.07) return 'mural';
+    return roll < 0.5 ? 'blank' : roll < 0.75 ? 'small' : 'grille';
+  }
   return roll < 0.75 ? 'blank' : 'small';
 }
 
@@ -77,16 +81,14 @@ function wall(
       const z0 = a[1] + (b[1] - a[1]) * t0;
       const x1 = a[0] + (b[0] - a[0]) * t1;
       const z1 = a[1] + (b[1] - a[1]) * t1;
-      const [u0, v0, u1, v1] = facadeUv(
-        house.finish,
-        featureFor(side, floor, bay, doorBay, shop, random),
-      );
+      const kind = featureFor(side, floor, bay, doorBay, shop, random);
+      const [u0, v0, u1, v1] = facadeUv(house.finish, kind);
       facade.quad(
         [x0, y0, z0],
         [x1, y0, z1],
         [x1, y1, z1],
         [x0, y1, z0],
-        house.color,
+        kind === 'mural' ? 0xffffff : house.color,
         [shade, shade, shade + 0.06, shade + 0.06],
         [
           [u0, v0],
