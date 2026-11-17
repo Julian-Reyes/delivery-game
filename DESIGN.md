@@ -21,9 +21,10 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 | 8    | Touch controls, placeholder sounds, performance pass, report | Pending |
 
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
-terrain following, tighter steering (2.5 rad/s once above 4.5 m/s, fading out below, so
-the tightest circle is about 1.8 m at walking pace and v / 2.5 above), airtime off ramps
-and crests, sliding along walls, and backing up: hold
+terrain following, steering that tightens when held (a tap or gentle turn uses the
+original 1.9 rad/s from 6 m/s; holding full lock ramps over 0.6 s to 2.5 rad/s from
+4.5 m/s with more lean, so the tightest circle drops from about 3.2 m to 1.8 m at walking
+pace), airtime off ramps and crests, sliding along walls, and backing up: hold
 the brake at a standstill and after 0.35 s the rider paddles the bike backwards with their
 feet at 1.6 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
 go. It also publishes `telemetry` (speed, throttle, brake, airtime, landings, scraping)

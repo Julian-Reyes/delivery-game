@@ -14,10 +14,21 @@ const ACCEL = 14;
 const BRAKE = 26;
 const DRAG = 0.6;
 const MAX_SPEED = 28;
-const TURN_RATE = 2.5;
-const MAX_LEAN = 0.7;
-/** Below this speed steering fades out, so the bike cannot spin on the spot. */
-const FULL_STEER_SPEED = 4.5;
+/**
+ * Steering. A tap or a gentle turn uses the base rate; holding full lock tightens the turn
+ * over HOLD_RAMP seconds to the held rate, with more lean, the way a rider commits to a
+ * tight corner. Below the full-steer speed steering fades out, so the bike cannot spin on
+ * the spot.
+ */
+const TURN_RATE = 1.9;
+const HELD_TURN_RATE = 2.5;
+const FULL_STEER_SPEED = 6;
+const HELD_FULL_STEER_SPEED = 4.5;
+const MAX_LEAN = 0.55;
+const HELD_MAX_LEAN = 0.7;
+const HOLD_RAMP = 0.6;
+/** Steering at least this hard counts as holding full lock. */
+const FULL_LOCK = 0.9;
 const GRAVITY = 22;
 /** How far below the predicted path the ground can be before we count as airborne. */
 const STICK = 0.06;
@@ -89,6 +100,8 @@ export class Rider {
     reversing: false,
   };
   private stoppedFor = 0;
+  /** Seconds full lock has been held in one direction; signed by the direction. */
+  private lockHeld = 0;
   /** Revs, gear and load, for the engine sound. */
   readonly engine = createEngine();
 
@@ -145,6 +158,7 @@ export class Rider {
     this.speed = 0;
     this.vy = 0;
     this.stoppedFor = 0;
+    this.lockHeld = 0;
     this.lean = 0;
     this.pitch = 0;
     this.grounded = true;
@@ -172,13 +186,22 @@ export class Rider {
 
     // Steering fades in with speed so the bike cannot spin on the spot. Pushed backwards,
     // the turned front wheel swings the bike the other way, and only slowly.
+    // Holding full lock one way builds up; easing off or switching sides starts again.
+    const fullLock = Math.abs(input.steer) >= FULL_LOCK ? Math.sign(input.steer) : 0;
+    this.lockHeld =
+      fullLock !== 0 && Math.sign(this.lockHeld) !== -fullLock ? this.lockHeld + fullLock * dt : 0;
+    const ramp = Math.min(1, Math.abs(this.lockHeld) / HOLD_RAMP);
+    const held = ramp * ramp * (3 - 2 * ramp);
+    const turnRate = TURN_RATE + (HELD_TURN_RATE - TURN_RATE) * held;
+    const fullSteer = FULL_STEER_SPEED + (HELD_FULL_STEER_SPEED - FULL_STEER_SPEED) * held;
+    const maxLean = MAX_LEAN + (HELD_MAX_LEAN - MAX_LEAN) * held;
     const grip =
       this.speed >= 0
-        ? Math.min(1, this.speed / FULL_STEER_SPEED) * (this.grounded ? 1 : AIR_STEER)
+        ? Math.min(1, this.speed / fullSteer) * (this.grounded ? 1 : AIR_STEER)
         : -REVERSE_STEER * (-this.speed / REVERSE_SPEED);
-    this.heading -= input.steer * TURN_RATE * grip * dt;
+    this.heading -= input.steer * turnRate * grip * dt;
 
-    const targetLean = input.steer * MAX_LEAN * Math.min(1, Math.max(0, this.speed) / 14);
+    const targetLean = input.steer * maxLean * Math.min(1, Math.max(0, this.speed) / 14);
     this.lean += (targetLean - this.lean) * Math.min(1, 8 * dt);
 
     const sin = Math.sin(this.heading);

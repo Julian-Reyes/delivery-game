@@ -54,9 +54,9 @@ export const ROAD_KINDS: Readonly<Record<RoadKind, RoadKindSpec>> = {
 
 /**
  * The tightest circle roads are designed for. It dates from the first handling (steering
- * faded out below 6 m/s at 1.9 rad/s) and is kept as a design margin: the bike now turns
- * tighter (`bike/rider.ts`), so every road laid out to this is comfortably rideable, and
- * changing it would regenerate the approved street layouts.
+ * faded out below 6 m/s at 1.9 rad/s), which is still how the bike turns until full lock
+ * is held; held, it turns tighter (`bike/rider.ts`). Changing this would regenerate the
+ * approved street layouts.
  */
 export const BIKE_TURN_RADIUS = 6 / 1.9 + 0.5;
 
