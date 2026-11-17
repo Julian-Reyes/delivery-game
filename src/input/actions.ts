@@ -3,7 +3,14 @@
  * game code never sees device events.
  */
 
-export const BUTTONS = ['confirm', 'pause', 'respawn', 'toggleDebug', 'toggleMap'] as const;
+export const BUTTONS = [
+  'confirm',
+  'pause',
+  'respawn',
+  'toggleDebug',
+  'toggleMap',
+  'freeCamera',
+] as const;
 export type ButtonAction = (typeof BUTTONS)[number];
 
 export interface RawInput {
@@ -13,6 +20,8 @@ export interface RawInput {
   brake: number;
   /** -1 (full left) .. +1 (full right). Steering and lean are one axis. */
   steer: number;
+  /** -1 (down) .. +1 (up). Only the free camera uses it. */
+  lift: number;
   /** Held state of each button this poll. */
   buttons: Record<ButtonAction, boolean>;
 }
@@ -28,12 +37,14 @@ export function createRawInput(): RawInput {
     throttle: 0,
     brake: 0,
     steer: 0,
+    lift: 0,
     buttons: {
       confirm: false,
       pause: false,
       respawn: false,
       toggleDebug: false,
       toggleMap: false,
+      freeCamera: false,
     },
   };
 }
@@ -42,6 +53,7 @@ export function resetRawInput(input: RawInput): void {
   input.throttle = 0;
   input.brake = 0;
   input.steer = 0;
+  input.lift = 0;
   for (const button of BUTTONS) input.buttons[button] = false;
 }
 
@@ -58,6 +70,8 @@ export function mergeInto(target: RawInput, source: RawInput): void {
   target.brake = Math.max(target.brake, clamp(source.brake, 0, 1));
   const steer = clamp(source.steer, -1, 1);
   if (Math.abs(steer) > Math.abs(target.steer)) target.steer = steer;
+  const lift = clamp(source.lift, -1, 1);
+  if (Math.abs(lift) > Math.abs(target.lift)) target.lift = lift;
   for (const button of BUTTONS) {
     target.buttons[button] = target.buttons[button] || source.buttons[button];
   }

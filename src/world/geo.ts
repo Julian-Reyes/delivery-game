@@ -249,18 +249,5 @@ export class GeoBuilder {
   }
 }
 
-/** Small deterministic random generator, so the city is identical on every run. */
-export function createRandom(seed: number): () => number {
-  let state = seed % 2147483647;
-  if (state <= 0) state += 2147483646;
-  return (): number => {
-    state = (state * 16807) % 2147483647;
-    return (state - 1) / 2147483646;
-  };
-}
-
-export function pick<T>(random: () => number, items: readonly T[]): T {
-  const item = items[Math.floor(random() * items.length)];
-  if (item === undefined) throw new Error('pick() needs a non-empty list');
-  return item;
-}
+// Kept here too so the mesh builders can import everything from one place.
+export { createRandom, pick } from './random';

@@ -16,7 +16,7 @@ import {
   surfaceHeightAt,
 } from './layout';
 
-/** Street furniture, vegetation, parked cars, the beach and the distant hills. */
+/** Street furniture, vegetation, parked cars, the beach and the offshore islands. */
 
 type Random = () => number;
 
@@ -46,7 +46,6 @@ const UMBRELLA = [0xd62828, 0xf7c600, 0x1d6fb8, 0x1f8a4c, 0xef7b22] as const;
 const WHITE = 0xf7f4ec;
 const FOREST = [0x3f7a45, 0x356b3c, 0x47854c] as const;
 const GRANITE = 0x8b8378;
-const HILL_HOUSES = [0xa9623f, 0xb86f4a, 0x9c5a3a, 0xf3f0e8, 0x7fb7e6, 0xf2c14e, 0xe8a0b0] as const;
 
 // --- Things you ride over ---------------------------------------------------------------
 
@@ -545,18 +544,11 @@ interface Dome {
 }
 
 /** Generic rounded hills. Deliberately not modelled on any real, recognizable peak. */
+// The hills around the city are real terrain now (`terrain.ts`); only the islands remain.
 const DOMES: readonly Dome[] = [
-  { cx: 0, cy: 0, cz: 285, rx: 340, ry: 120, rz: 140, rocky: true },
-  { cx: -255, cy: -5, cz: 30, rx: 135, ry: 85, rz: 200, rocky: false },
-  { cx: 262, cy: -5, cz: 10, rx: 140, ry: 70, rz: 190, rocky: true },
   { cx: -170, cy: -3, cz: -330, rx: 45, ry: 24, rz: 32, rocky: true },
   { cx: 210, cy: -3, cz: -380, rx: 70, ry: 34, rz: 45, rocky: false },
 ];
-
-function domeHeight(dome: Dome, x: number, z: number): number | null {
-  const inside = 1 - ((x - dome.cx) / dome.rx) ** 2 - ((z - dome.cz) / dome.rz) ** 2;
-  return inside <= 0 ? null : dome.cy + dome.ry * Math.sqrt(inside);
-}
 
 function addDome(city: GeoBuilder, dome: Dome, random: Random): void {
   const rings = 6;
@@ -586,44 +578,10 @@ function addDome(city: GeoBuilder, dome: Dome, random: Random): void {
   }
 }
 
-/** Hills around the map, hillside houses stacked up them, and tunnel mouths on the avenue. */
+/** Offshore islands, the tunnel mouths on the avenue, and the walls that keep you in. */
 export function addBackdrop(city: GeoBuilder, solids: SolidBox[], random: Random): void {
   city.resetFrame();
   for (const dome of DOMES) addDome(city, dome, random);
-
-  // Hillside community: small boxes climbing the slopes that face the neighborhood.
-  const scatter = (
-    dome: Dome,
-    count: number,
-    x0: number,
-    x1: number,
-    z0: number,
-    z1: number,
-  ): void => {
-    for (let i = 0; i < count; i++) {
-      const x = x0 + random() * (x1 - x0);
-      const z = z0 + random() * (z1 - z0);
-      const y = domeHeight(dome, x, z);
-      if (y === null || y < heightAt(x, z) + 2 || y > dome.cy + dome.ry * 0.72) continue;
-      const w = 4 + random() * 3.5;
-      const h = 3 + random() * 4;
-      city.box(
-        x,
-        y + h / 2 - 1.2,
-        z,
-        w,
-        h,
-        4 + random() * 3.5,
-        pick(random, HILL_HOUSES),
-        0.72,
-        0x97928a,
-      );
-    }
-  };
-  const [north, west, east] = DOMES;
-  if (north) scatter(north, 420, -200, 200, 152, 232);
-  if (west) scatter(west, 150, -190, -122, -70, 150);
-  if (east) scatter(east, 150, 124, 190, -70, 150);
 
   // The avenue disappears into a tunnel at each end.
   const mid = (AVENUE_Z_MIN + AVENUE_Z_MAX) / 2;

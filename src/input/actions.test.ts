@@ -26,6 +26,17 @@ describe('mergeInto', () => {
     expect(target.steer).toBe(-0.8);
   });
 
+  it('keeps the lift value with the largest magnitude, clamped', () => {
+    const target = createRawInput();
+    const a = createRawInput();
+    const b = createRawInput();
+    a.lift = 0.5;
+    b.lift = -3;
+    mergeInto(target, a);
+    mergeInto(target, b);
+    expect(target.lift).toBe(-1);
+  });
+
   it('holds a button if any source holds it', () => {
     const target = createRawInput();
     const a = createRawInput();

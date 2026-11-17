@@ -34,6 +34,8 @@ import {
   addVegetation,
 } from './props';
 import type { SolidBox } from './props';
+import type { Terrain } from './terrain';
+import { buildTerrainGeometry } from './terrainMesh';
 import { createGroundTextures, createSignAtlas } from './textures';
 
 const SKY_TOP = 0x3f8fdc;
@@ -134,12 +136,13 @@ export class World {
 
   private readonly sun = new DirectionalLight(0xfff1dc, 2.4);
   private readonly sky = createSky();
+  private readonly fog = new Fog(SKY_HORIZON, 70, 520);
 
-  constructor(physics: Physics, anisotropy: number) {
+  constructor(physics: Physics, anisotropy: number, terrain: Terrain, seed: number) {
     const random = createRandom(2024);
     const { scene } = this;
 
-    scene.fog = new Fog(SKY_HORIZON, 70, 520);
+    scene.fog = this.fog;
     scene.add(this.sky);
     scene.add(new HemisphereLight(0xcfe6ff, 0x8a7a66, 1.5));
 
@@ -190,6 +193,15 @@ export class World {
       scene.add(mesh);
     }
 
+    // Hills: one material, chunked so the parts behind the camera are skipped.
+    const terrainGeometry = buildTerrainGeometry(terrain, seed);
+    const hillMaterial = new MeshLambertMaterial({ vertexColors: true });
+    for (const chunk of terrainGeometry.chunks) {
+      const mesh = new Mesh(chunk, hillMaterial);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+
     const paint = new MeshLambertMaterial({ vertexColors: true });
     scene.add(new Mesh(city.build(), paint));
 
@@ -227,6 +239,7 @@ export class World {
 
     // Physics.
     physics.addGroundMesh(ground.colliderPositions, ground.colliderIndices);
+    physics.addGroundMesh(terrainGeometry.colliderPositions, terrainGeometry.colliderIndices);
     physics.addGroundMesh(new Float32Array(extras.positions), new Uint32Array(extras.indices));
     for (const b of buildings) {
       const centerY = (b.floorY + b.height + b.baseY) / 2;
@@ -242,6 +255,11 @@ export class World {
     }
     for (const s of solids) physics.addSolidBox(s.x, s.y, s.z, s.hx, s.hy, s.hz, s.yaw);
     physics.commit();
+  }
+
+  /** Fog hides the map edges while riding; the free camera turns it off to see the layout. */
+  setFog(enabled: boolean): void {
+    this.scene.fog = enabled ? this.fog : null;
   }
 
   /**

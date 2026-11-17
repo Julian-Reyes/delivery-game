@@ -5,7 +5,8 @@ import type { RoadIssue } from '../world/roads/validate';
 /**
  * Overhead map of the road graph for checking the layout: elevation with contour lines,
  * every road coloured by area, pedestrian routes dashed, the junctions where areas meet,
- * and any validation problems. Scroll to zoom, drag to pan, double-click to reset.
+ * and any validation problems. Scroll to zoom, drag to pan, click to put the rider on the
+ * nearest road there. Reopening the map resets the view.
  */
 
 export interface MapBounds {
@@ -78,6 +79,8 @@ export class DebugMap {
   private centerX = 0;
   private centerZ = 0;
   private dragging = false;
+  /** CSS pixels moved since the pointer went down, to tell a click from a drag. */
+  private dragDistance = 0;
 
   private riderX = 0;
   private riderZ = 0;
@@ -89,6 +92,7 @@ export class DebugMap {
     private readonly heightAt: (x: number, z: number) => number,
     private readonly bounds: MapBounds,
     private readonly issues: readonly RoadIssue[],
+    private readonly onPick?: (x: number, z: number) => void,
   ) {
     this.element = document.createElement('div');
     this.element.className = 'debug-map';
@@ -106,7 +110,6 @@ export class DebugMap {
     this.canvas.addEventListener('pointerdown', this.onPointerDown);
     this.canvas.addEventListener('pointermove', this.onPointerMove);
     this.canvas.addEventListener('pointerup', this.onPointerUp);
-    this.canvas.addEventListener('dblclick', this.resetView);
   }
 
   get isVisible(): boolean {
@@ -333,11 +336,13 @@ export class DebugMap {
 
   private readonly onPointerDown = (event: PointerEvent): void => {
     this.dragging = true;
+    this.dragDistance = 0;
     this.canvas.setPointerCapture(event.pointerId);
   };
 
   private readonly onPointerMove = (event: PointerEvent): void => {
     if (!this.dragging) return;
+    this.dragDistance += Math.abs(event.movementX) + Math.abs(event.movementY);
     this.centerX -= event.movementX * this.scale;
     this.centerZ += event.movementY * this.scale;
   };
@@ -345,5 +350,12 @@ export class DebugMap {
   private readonly onPointerUp = (event: PointerEvent): void => {
     this.dragging = false;
     this.canvas.releasePointerCapture(event.pointerId);
+    if (this.dragDistance < 4 && this.onPick) {
+      const rect = this.canvas.getBoundingClientRect();
+      this.onPick(
+        this.centerX + (event.clientX - rect.left - rect.width / 2) * this.scale,
+        this.centerZ - (event.clientY - rect.top - rect.height / 2) * this.scale,
+      );
+    }
   };
 }

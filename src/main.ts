@@ -3,15 +3,18 @@ import { Rider } from './bike/rider';
 import { BRAND } from './brand';
 import { DebugOverlay } from './core/debugOverlay';
 import { createLoop } from './core/loop';
+import { FreeCamera } from './core/freeCamera';
 import { createRenderer } from './core/renderer';
 import { GamepadSource } from './input/gamepad';
 import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
 import { DebugMap } from './ui/debugMap';
-import { HALF, SPAWN, heightAt } from './world/layout';
+import { SPAWN } from './world/layout';
+import { isRideable, nearestOnGraph, pointAlong } from './world/roads/graph';
 import { DEFAULT_MAP_SEED, buildRoadNetwork } from './world/roads/network';
 import { validateGraph } from './world/roads/validate';
+import { WORLD, buildTerrain } from './world/terrain';
 import { World } from './world/world';
 import './style.css';
 
@@ -63,26 +66,46 @@ async function boot(): Promise<void> {
   const roads = buildRoadNetwork(seed);
   const roadIssues = validateGraph(roads, SPAWN.x, SPAWN.z);
   if (roadIssues.length > 0) console.warn(`Road layout (seed ${seed}):`, roadIssues);
-  const map = new DebugMap(
-    app,
-    roads,
-    heightAt,
-    { x0: -HALF, x1: HALF, z0: -HALF, z1: HALF },
-    roadIssues,
-  );
+  const terrain = buildTerrain(seed, roads);
 
   const physics = await Physics.create();
   const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  const world = new World(physics, anisotropy);
+  const world = new World(physics, anisotropy, terrain, seed);
   const rider = new Rider(physics, SPAWN);
   world.scene.add(rider.object);
   const chase = new ChaseCamera(physics);
-  view.onResize((width, height) => chase.setAspect(width / height));
+  // Developer tool only: fly over the layout to inspect it.
+  const free = import.meta.env.DEV ? new FreeCamera((x, z) => terrain.heightAt(x, z)) : null;
+  let flying = false;
+  view.onResize((width, height) => {
+    chase.setAspect(width / height);
+    free?.setAspect(width / height);
+  });
+
+  // Clicking the map drops the rider on the nearest road there, facing along it.
+  const dropOnRoad = (x: number, z: number): void => {
+    const spot = nearestOnGraph(roads, x, z, isRideable);
+    if (!spot) return;
+    const edge = roads.getEdge(spot.edge);
+    const ahead = pointAlong(edge.points, Math.min(edge.length, spot.along + 2));
+    const behind = pointAlong(edge.points, Math.max(0, spot.along - 2));
+    rider.teleport(spot.x, spot.z, Math.atan2(ahead.x - behind.x, ahead.z - behind.z));
+    chase.snap();
+  };
+  const map = new DebugMap(
+    app,
+    roads,
+    (x, z) => terrain.heightAt(x, z),
+    WORLD,
+    roadIssues,
+    dropOnRoad,
+  );
 
   const hint = document.createElement('p');
   hint.className = 'hint';
   hint.textContent =
-    'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · M map · ` debug';
+    'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · M map · ` debug' +
+    (free ? ' · C free camera (Q/E height)' : '');
   hint.hidden = true;
 
   const titleCard = buildTitleCard();
@@ -99,7 +122,7 @@ async function boot(): Promise<void> {
 
   if (import.meta.env.DEV) {
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
-    Object.assign(window, { __game: { rider, chase, world, roads } });
+    Object.assign(window, { __game: { rider, chase, free, world, roads, terrain } });
   }
 
   let frameDt = 0;
@@ -109,6 +132,14 @@ async function boot(): Promise<void> {
       input.poll();
       if (input.wasPressed('toggleDebug')) overlay.toggle();
       if (input.wasPressed('toggleMap')) map.toggle();
+      if (free && riding && input.wasPressed('freeCamera')) {
+        flying = !flying;
+        const pose = rider.pose;
+        if (flying) free.start(pose.x, pose.y, pose.z, pose.heading);
+        else chase.snap();
+        world.setFog(!flying);
+      }
+      if (free && flying) free.update(dt, input.state);
       if (input.wasPressed('confirm')) startRiding();
       if (riding && input.wasPressed('respawn')) {
         rider.respawn();
@@ -116,14 +147,15 @@ async function boot(): Promise<void> {
       }
     },
     step(dt): void {
-      if (riding) rider.step(dt, input.state);
+      if (riding && !flying) rider.step(dt, input.state);
     },
     render(alpha): void {
       rider.render(alpha);
       chase.update(frameDt, rider.pose);
-      const eye = chase.camera.position;
+      const camera = free && flying ? free.camera : chase.camera;
+      const eye = camera.position;
       world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);
-      renderer.render(world.scene, chase.camera);
+      renderer.render(world.scene, camera);
       map.update(rider.pose.x, rider.pose.z, rider.pose.heading);
     },
     stats(frameMs, cpuMs): void {

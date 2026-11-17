@@ -21,7 +21,13 @@ export default tseslint.config(
   {
     // The simulation layer and the map data must stay pure: no rendering, physics engine or
     // DOM code.
-    files: ['src/sim/**/*.ts', 'src/world/layout.ts', 'src/world/roads/**/*.ts'],
+    files: [
+      'src/sim/**/*.ts',
+      'src/world/layout.ts',
+      'src/world/random.ts',
+      'src/world/terrain.ts',
+      'src/world/roads/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

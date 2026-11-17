@@ -223,6 +223,24 @@ export function departure(edge: RoadEdge, node: number, reach: number): { x: num
   return { x: dx / length, z: dz / length };
 }
 
+/** The point `distance` metres (horizontally) along a centreline, clamped to its ends. */
+export function pointAlong(points: readonly RoadPoint[], distance: number): RoadPoint {
+  let remaining = distance;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    if (!a || !b) continue;
+    const segment = Math.hypot(b.x - a.x, b.z - a.z);
+    if (remaining <= segment && segment > 0) {
+      const t = Math.max(0, remaining / segment);
+      return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+    }
+    remaining -= segment;
+  }
+  const last = points[points.length - 1] ?? { x: 0, y: 0, z: 0 };
+  return { x: last.x, y: last.y, z: last.z };
+}
+
 export interface GraphPosition {
   edge: number;
   /** Horizontal distance along the edge from its `from` node. */

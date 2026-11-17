@@ -77,15 +77,19 @@ routes and order locations should read from it too.
   towards the top.
 - **Street life** (`props.ts`): utility poles with tangled overhead wires, coconut palms,
   shade trees, festa junina bunting over the cobblestone street, parked cars and vans,
-  plastic bar tables, beach parasols, kiosks, and hills with hillside houses as a backdrop.
+  plastic bar tables, beach parasols, kiosks, and two offshore islands.
+- **Terrain** (`terrain.ts`, `terrainMesh.ts`): the hills around the city are real ground
+  now, on a 4 m grid covering the whole world (x −682..282, z −262..642). It blends out of
+  the city's edge without a step, so `layout.ts` still owns the city's ground. See the map
+  expansion section.
 - **Textures** (`textures.ts`): painted with the 2D canvas at startup, so there are no image
   files. Shop names are invented and generic; the fictional app appears on a few signs.
 - **Draw calls:** one mesh per ground texture (7), one for all vertex-colored geometry, one
-  each for ramps and bumps, road markings, signs, wires, sea and sky. About 24 in total
-  with the rider and its shadow pass, at roughly 80k triangles.
+  each for ramps and bumps, road markings, signs, wires, sea and sky, plus the terrain
+  chunks in view. About 36 in total with the rider and its shadow pass.
 - **Shade:** building shadows on the ground are baked into the ground's vertex colors from
   the sun direction. Only the rider casts a real-time shadow.
-- **Physics:** the ground, ramps and speed bumps are triangle-mesh colliders; buildings,
+- **Physics:** the ground, terrain, ramps and speed bumps are triangle-mesh colliders; buildings,
   parked cars, kiosks and the map boundary are boxes.
 
 Known gaps: the city is one merged mesh, so nothing is frustum-culled (split it by block if
@@ -109,8 +113,28 @@ are not.
   a headland. A ridge keeps it apart from Area 1.
 - **Edges:** steep wooded slopes with walls hidden in them, backdrop hills further out, fog.
 
-Order of work: road graph and debug map (done), terrain system and extended world, Area 1
+Order of work: road graph and debug map (done), terrain system and extended world (done), Area 1
 main roads, Area 1 small streets, Area 1 buildings and delivery spots, then Area 2.
+
+### Terrain
+
+`createNaturalHeight(seed)` is the landscape before roads: a hillside massif behind the city
+with a winding stream ravine, the ridge between the two areas, the headland, hills over the
+east tunnel, high ground rising towards every land edge (so you never see under the world's
+edge), value-noise roughness, soft terracing in both favela areas, and cliffs down to a
+cove-lined coast. Road generators read it to lay roads along the hills. `buildTerrain(seed,
+roads)` samples it on the grid and carves every non-city road in: a flat bed 0.15 m under
+the road surface, 1.5 m shoulders, then cut and fill banks at 1.1:1 back to natural ground.
+`Terrain.heightAt` uses the same triangle split as the mesh, so anything placed with it sits
+on what you see.
+
+The mesh is split into 192 m chunks (about 18 hold land) with one vertex-colored material
+and normals from the height grid, so chunks shade seamlessly. Cells inside the city or under
+the sea are skipped. The collider is one triangle mesh. Draw calls went from 24 to about 36,
+about 120k triangles in view.
+
+The city is still sealed (its buildings and boundary walls) until the hillside roads open
+it.
 
 ### Road graph
 
@@ -142,7 +166,10 @@ riding or walking route, for delivery distances and the waypoint later.
 
 **M** shows the debug map: relief and 5 m contours, roads coloured by area, pedestrian routes
 dashed, rings where areas meet, red crosses on validation problems, and the rider. Scroll to
-zoom, drag to pan, double-click to reset.
+zoom, drag to pan, click to drop the rider on the nearest road there.
+
+**C** (dev builds) switches to a free camera: W/S fly, A/D turn, Q/E height. It tilts
+towards top-down the higher it goes and turns the fog off.
 
 ## Tech
 
