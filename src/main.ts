@@ -12,6 +12,8 @@ import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
 import { DebugMap } from './ui/debugMap';
+import { Minimap } from './ui/minimap';
+import { planBuildings } from './world/buildings';
 import { HALF, SPAWN, surfaceAt } from './world/layout';
 import { isRideable, nearestOnGraph, pointAlong } from './world/roads/graph';
 import { DEFAULT_MAP_SEED, buildRoadNetwork } from './world/roads/network';
@@ -113,6 +115,14 @@ async function boot(): Promise<void> {
     dropOnRoad,
   );
   map.setFavela(favela.houses, favela.spots);
+  const minimap = new Minimap(app, {
+    roads,
+    heightAt: (x, z) => terrain.heightAt(x, z),
+    bounds: WORLD,
+    houses: favela.houses,
+    buildings: planBuildings(),
+    spots: favela.spots,
+  });
 
   const hint = document.createElement('p');
   hint.className = 'hint';
@@ -131,6 +141,7 @@ async function boot(): Promise<void> {
     riding = true;
     // Starting to ride is the user gesture browsers require before any sound.
     audio.start();
+    minimap.show(true);
     titleCard.remove();
     hint.hidden = false;
   };
@@ -184,6 +195,13 @@ async function boot(): Promise<void> {
       world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);
       renderer.render(world.scene, camera);
       map.update(rider.pose.x, rider.pose.z, rider.pose.heading);
+      minimap.update(
+        rider.pose.x,
+        rider.pose.z,
+        rider.pose.heading,
+        rider.telemetry.speed,
+        frameDt,
+      );
       const { x, z } = rider.pose;
       const cobbles = Math.abs(x) < HALF && Math.abs(z) < HALF && surfaceAt(x, z) === 'cobble';
       audio.update(frameDt, rider.telemetry, rider.engine, cobbles, rider.takeLanding());

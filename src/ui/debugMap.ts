@@ -239,11 +239,12 @@ export class DebugMap {
     }
     this.elevation ??= this.buildElevation();
 
-    // World to CSS pixels: +x right, +z (north) up.
+    // World to CSS pixels: +z (north) up and +x to the LEFT, which is how the world looks
+    // from the bike: facing +z in a right-handed y-up world, +x is on your left.
     const k = 1 / this.scale;
-    const ox = rect.width / 2 - this.centerX * k;
+    const ox = rect.width / 2 + this.centerX * k;
     const oz = rect.height / 2 + this.centerZ * k;
-    context.setTransform(ratio * k, 0, 0, -ratio * k, ratio * ox, ratio * oz);
+    context.setTransform(-ratio * k, 0, 0, -ratio * k, ratio * ox, ratio * oz);
 
     context.fillStyle = '#12202c';
     context.fillRect(
@@ -384,10 +385,10 @@ export class DebugMap {
     // Keep the world point under the cursor fixed while zooming.
     const px = event.clientX - rect.left - rect.width / 2;
     const pz = event.clientY - rect.top - rect.height / 2;
-    const worldX = this.centerX + px * this.scale;
+    const worldX = this.centerX - px * this.scale;
     const worldZ = this.centerZ - pz * this.scale;
     this.scale = Math.min(4, Math.max(0.05, this.scale * Math.exp(event.deltaY * 0.0015)));
-    this.centerX = worldX - px * this.scale;
+    this.centerX = worldX + px * this.scale;
     this.centerZ = worldZ + pz * this.scale;
   };
 
@@ -400,7 +401,7 @@ export class DebugMap {
   private readonly onPointerMove = (event: PointerEvent): void => {
     if (!this.dragging) return;
     this.dragDistance += Math.abs(event.movementX) + Math.abs(event.movementY);
-    this.centerX -= event.movementX * this.scale;
+    this.centerX += event.movementX * this.scale;
     this.centerZ += event.movementY * this.scale;
   };
 
@@ -410,7 +411,7 @@ export class DebugMap {
     if (this.dragDistance < 4 && this.onPick) {
       const rect = this.canvas.getBoundingClientRect();
       this.onPick(
-        this.centerX + (event.clientX - rect.left - rect.width / 2) * this.scale,
+        this.centerX - (event.clientX - rect.left - rect.width / 2) * this.scale,
         this.centerZ - (event.clientY - rect.top - rect.height / 2) * this.scale,
       );
     }
