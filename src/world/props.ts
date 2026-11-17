@@ -491,6 +491,9 @@ export function addBarTables(city: GeoBuilder, random: Random): void {
   city.resetFrame();
 }
 
+/** Promenade kiosks sit halfway between the palms, which stand every 17 m from x = -138. */
+const KIOSK_X: readonly number[] = [-129.5, -95.5, -61.5, -27.5, 6.5, 40.5, 74.5, 108.5];
+
 /** Parasols and towels on the sand, kiosks on the promenade. */
 export function addBeach(city: GeoBuilder, solids: SolidBox[], random: Random): void {
   for (let i = 0; i < 16; i++) {
@@ -522,10 +525,13 @@ export function addBeach(city: GeoBuilder, solids: SolidBox[], random: Random): 
     );
   }
 
-  for (const x of [-104, -22, 48, 122]) {
+  // Kiosks along the promenade, midway between the palms, with plastic tables at every
+  // other one.
+  const roofs = [0x1f8a4c, 0xd62828, 0x1d6fb8, 0xef7b22, 0xf2b632] as const;
+  KIOSK_X.forEach((x, index) => {
     const z = SAND_EDGE_Z + 3.6;
     const y = heightAt(x, z) + CURB;
-    const roof = pick(random, [0x1f8a4c, 0xd62828, 0x1d6fb8, 0xef7b22] as const);
+    const roof = roofs[index % roofs.length] ?? 0x1f8a4c;
     city.setFrame(x, y, z, 0);
     city.box(0, 1.3, 0, 3.2, 2.6, 2.6, WHITE, 0.8);
     city.box(0, 2.7, 0, 4.6, 0.2, 4, roof, 0.85);
@@ -533,8 +539,25 @@ export function addBeach(city: GeoBuilder, solids: SolidBox[], random: Random): 
     city.quad([-1.3, 1, 1.31], [1.3, 1, 1.31], [1.3, 2.1, 1.31], [-1.3, 2.1, 1.31], 0x1c1815);
     city.quad([1.3, 1, -1.31], [-1.3, 1, -1.31], [-1.3, 2.1, -1.31], [1.3, 2.1, -1.31], 0x1c1815);
     city.box(0, 0.95, 1.45, 2.8, 0.08, 0.35, roof);
+    // A stack of green coconuts on the counter.
+    for (let c = 0; c < 4; c++) city.blob(-0.9 + c * 0.25, 1.1, 1.5, 0.12, 0.12, 0.12, 0x5a8f3a);
     solids.push({ x, y: y + 1.3, z, hx: 1.6, hy: 1.3, hz: 1.3, yaw: 0 });
-  }
+    if (index % 2 === 0) {
+      for (const side of [-1, 1]) {
+        const tx = x + side * 4.2;
+        const color = pick(random, PLASTIC);
+        city.setFrame(tx, y, z, random() * Math.PI);
+        city.box(0, 0.36, 0, 0.08, 0.72, 0.08, color);
+        city.box(0, 0.74, 0, 0.72, 0.04, 0.72, color);
+        for (let k = 0; k < 2; k++) {
+          const angle = k * Math.PI + random() * 0.4;
+          city.setFrame(tx + Math.sin(angle) * 0.8, y, z + Math.cos(angle) * 0.8, angle);
+          city.box(0, 0.22, 0, 0.36, 0.44, 0.36, color, 0.8);
+          city.box(0, 0.66, 0.17, 0.38, 0.44, 0.04, color);
+        }
+      }
+    }
+  });
   city.resetFrame();
 }
 

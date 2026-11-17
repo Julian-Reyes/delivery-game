@@ -28,6 +28,7 @@ export default tseslint.config(
       'src/world/terrain.ts',
       'src/world/houses.ts',
       'src/world/roads/**/*.ts',
+      'src/traffic/traffic.ts',
     ],
     rules: {
       'no-restricted-imports': [

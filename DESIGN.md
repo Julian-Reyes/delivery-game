@@ -17,7 +17,7 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 | 3    | Cargo and pay pure functions with tests                      | Pending |
 | 5    | Bike controller, wheelie, crash and respawn, camera          | Partial |
 | 6    | Delivery loop: title, order picker, waypoint, HUD, results   | Pending |
-| 7    | Traffic: cars and a bus on fixed routes                      | Pending |
+| 7    | Traffic: cars in the city, motorbikes in the favela          | Done    |
 | 8    | Touch controls, placeholder sounds, performance pass, report | Pending |
 
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
@@ -92,7 +92,8 @@ routes and order locations should read from it too.
   towards the top.
 - **Street life** (`props.ts`): utility poles with tangled overhead wires, coconut palms,
   shade trees, festa junina bunting over the cobblestone street, parked cars and vans,
-  plastic bar tables, beach parasols, kiosks, and two offshore islands.
+  plastic bar tables, beach parasols, eight promenade kiosks (between the palms, coconuts on
+  the counter, tables at every other one), and two offshore islands.
 - **Terrain** (`terrain.ts`, `terrainMesh.ts`): the hills around the city are real ground
   now, on a 4 m grid covering the whole world (x −682..282, z −262..642). It blends out of
   the city's edge without a step, so `layout.ts` still owns the city's ground. See the map
@@ -358,13 +359,32 @@ src/
   bike/        controller, bike mesh, camera rig
   world/       neighborhood layout, merged geometry, lighting, fog
     roads/     road graph, city streets, validation, routing (pure, tested)
-  traffic/     routes, vehicles (instanced)
+  traffic/     traffic simulation (pure, tested), instanced vehicles
   game/        delivery state machine, session earnings
   ui/          title, order picker, HUD, results, debug map (DOM)
   audio/       synthesized placeholder sounds
 ```
 
 Folders are created when their step is built.
+
+## Traffic
+
+`traffic/traffic.ts` (pure, tested) runs 22 cars and vans on the city streets and 30
+motorbikes on the favela's roads, lanes and alleys, stepped at the fixed 60 Hz rate. They
+follow the road graph on the right-hand side (on the avenue, two lanes each way, the outer
+one clear of the parked cars; on the favela roads, clear of the parked cars there), pick a
+road at random at each junction, turn round at dead ends, and cars reaching a tunnel mouth
+come back out of the other one. Speeds come from the road kind and slow for bends (sideways
+grip) and junctions; each vehicle keeps a gap to what is in front of it in its corridor,
+always stops for the player, and two vehicles stuck nose to nose edge past each other
+after a couple of seconds.
+
+`traffic/trafficView.ts` draws them as instanced meshes (car, van, motorbike, rider), tinted
+per vehicle and interpolated between steps; motorbikes lean into bends. Cars and vans carry
+moving box colliders (`Physics.addMovingBox`) that pair with nothing but answer the rider's
+queries, so they are solid to ride into at almost no cost; motorbikes do not, so the
+narrow lanes stay passable. Traffic keeps moving on the title screen and stops while
+paused.
 
 ## Sound
 

@@ -12,6 +12,8 @@ import { GamepadSource } from './input/gamepad';
 import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
+import { Traffic } from './traffic/traffic';
+import { TrafficView } from './traffic/trafficView';
 import { DebugMap } from './ui/debugMap';
 import { Minimap } from './ui/minimap';
 import { SettingsMenu } from './ui/settingsMenu';
@@ -109,6 +111,8 @@ async function boot(): Promise<void> {
   const world = new World(physics, anisotropy, terrain, roads, favela, seed);
   const rider = new Rider(physics, SPAWN);
   world.scene.add(rider.object);
+  const traffic = new Traffic(roads, { seed, cars: 22, bikes: 30, avoid: SPAWN });
+  const trafficView = new TrafficView(world.scene, physics, traffic);
   const chase = new ChaseCamera(physics);
   // Developer tool only: fly over the layout to inspect it.
   const free = import.meta.env.DEV ? new FreeCamera((x, z) => terrain.heightAt(x, z)) : null;
@@ -200,7 +204,7 @@ async function boot(): Promise<void> {
     input.addSource(autopilot);
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
     Object.assign(window, {
-      __game: { rider, chase, free, world, roads, terrain, favela, autopilot, audio },
+      __game: { rider, chase, free, world, roads, terrain, favela, autopilot, audio, traffic },
     });
   }
 
@@ -242,10 +246,16 @@ async function boot(): Promise<void> {
       }
     },
     step(dt): void {
-      if (riding && !flying && !settings.isOpen) rider.step(dt, input.state);
+      if (settings.isOpen) return;
+      // Traffic first, so the rider collides with where the cars are this step.
+      traffic.step(dt, rider.pose);
+      trafficView.syncColliders();
+      physics.refresh();
+      if (riding && !flying) rider.step(dt, input.state);
     },
     render(alpha): void {
       rider.render(alpha);
+      trafficView.render(alpha);
       world.animate(frameDt);
       chase.update(frameDt, rider.pose, rider.eye);
       const camera = free && flying ? free.camera : chase.camera;

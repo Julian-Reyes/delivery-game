@@ -22,6 +22,11 @@ const RIDER_RADIUS = 0.45;
 /** Height of the rider's collision ball above the ground contact point. */
 const RIDER_CENTER = 0.95;
 
+export interface MovingBox {
+  /** Put the box's centre here, turned about the vertical. */
+  place(x: number, y: number, z: number, yaw: number): void;
+}
+
 export interface GroundHit {
   y: number;
   /** Surface normal. */
@@ -74,8 +79,36 @@ export class Physics {
     );
   }
 
+  /**
+   * A box obstacle that moves (traffic). It only answers queries: it never pairs with the
+   * ground, the rider or other moving boxes, so updating it costs almost nothing.
+   */
+  addMovingBox(hx: number, hy: number, hz: number): MovingBox {
+    const collider = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(hx, hy, hz).setCollisionGroups(groups(SOLID, RIDER)),
+    );
+    const rotation = { x: 0, y: 0, z: 0, w: 1 };
+    const translation = { x: 0, y: 0, z: 0 };
+    return {
+      place(x: number, y: number, z: number, yaw: number): void {
+        translation.x = x;
+        translation.y = y;
+        translation.z = z;
+        rotation.y = Math.sin(yaw / 2);
+        rotation.w = Math.cos(yaw / 2);
+        collider.setTranslation(translation);
+        collider.setRotation(rotation);
+      },
+    };
+  }
+
   /** Call once after adding static colliders so queries can see them. */
   commit(): void {
+    this.world.step();
+  }
+
+  /** Call after moving boxes so the next queries see where they are now. */
+  refresh(): void {
     this.world.step();
   }
 
