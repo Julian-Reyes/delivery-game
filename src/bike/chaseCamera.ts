@@ -1,4 +1,4 @@
-import { PerspectiveCamera } from 'three';
+import { PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import type { Object3D } from 'three';
 import type { Physics } from '../physics/physics';
 import type { Pose } from './rider';
@@ -37,7 +37,7 @@ function dampFactor(rate: number, dt: number): number {
  * The rider camera. In the two chase views it hangs on a spring arm behind the rider,
  * swinging round with a little lag, and a ray from the rider to the camera shortens the
  * arm before it can pass through a building or dip under a hill. In first person it sits
- * at the rider's eyes and leans and pitches with the bike.
+ * at the rider's eyes, turning and pitching with the bike but kept level through corners.
  */
 export class ChaseCamera {
   readonly camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR_PLANE, 2000);
@@ -47,6 +47,10 @@ export class ChaseCamera {
   private arm = CHASE.far.distance;
   private initialized = false;
   private view: CameraView = 'far';
+  private readonly eyePosition = new Vector3();
+  private readonly eyeRotation = new Quaternion();
+  private readonly eyeScale = new Vector3();
+  private readonly lookTarget = new Vector3();
 
   constructor(private readonly physics: Physics) {}
 
@@ -76,9 +80,14 @@ export class ChaseCamera {
   /** Follow the rider. `eye` is the rider's eye anchor, used in first person. */
   update(dt: number, pose: Pose, eye: Object3D): void {
     if (this.view === 'first') {
+      // From the rider's eyes, but with the head held level the way riders do: follow
+      // where the bike points and its pitch, not its lean into the corner.
       eye.updateWorldMatrix(true, false);
-      eye.matrixWorld.decompose(this.camera.position, this.camera.quaternion, this.camera.scale);
-      this.camera.scale.set(1, 1, 1);
+      eye.matrixWorld.decompose(this.eyePosition, this.eyeRotation, this.eyeScale);
+      this.lookTarget.set(0, 0, -1).applyQuaternion(this.eyeRotation).add(this.eyePosition);
+      this.camera.position.copy(this.eyePosition);
+      this.camera.up.set(0, 1, 0);
+      this.camera.lookAt(this.lookTarget);
       return;
     }
     const { distance, height, focusHeight, lookAhead } = CHASE[this.view];

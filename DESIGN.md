@@ -311,8 +311,8 @@ once into an offscreen canvas; each frame draws a rotated crop.
 **Camera views and the pause menu.** Esc (the pause action) pauses the game and opens a
 settings menu (`ui/settingsMenu.ts`) where the player picks one of three views: far chase
 (the original spring-arm camera), close chase (nearer and lower), and first person from
-the rider's eyes (an anchor in the bike model that leans and pitches with it; the helmet is
-hidden, the field of view widens to 75° and the near plane drops so the bars, mirrors and
+the rider's eyes (an anchor in the bike model; the view turns and pitches with the bike but
+stays level through corners, as a rider holds their head; the helmet is hidden, the field of view widens to 75° and the near plane drops so the bars, mirrors and
 clocks show at the bottom). Mouse, keyboard and gamepad all work it; keyboard and gamepad
 through the input actions. The choice is remembered in local storage. The sound ducks while
 paused.
