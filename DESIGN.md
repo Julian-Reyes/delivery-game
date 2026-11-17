@@ -298,8 +298,8 @@ reach from the spawn, and edges it can enter but never leave. `route.ts` finds t
 riding or walking route, for delivery distances and the waypoint later.
 
 **Minimap** (`ui/minimap.ts`), bottom left while riding, in the style of an open-world
-radar: round, heading-up, the bike's white arrow in the middle, zooming out from 75 m to 150 m ahead with speed, an N riding the
-edge, and pickups and drop-offs as round blips. Inside the city the ground is painted
+radar: round, heading-up, the bike's white arrow in the middle, zooming out from 75 m to
+150 m radius with speed, an N on the rim, and pickups and drop-offs as round blips. Inside the city the ground is painted
 pixel by pixel from `surfaceAt`, so every street has its true width: the 15 m four-lane
 seafront avenue in bright cream with its double yellow line and lane dashes, the 10 m side
 streets in grey with dark pavements, sand on the beach, the promenade's black and white
