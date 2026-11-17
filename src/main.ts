@@ -116,7 +116,7 @@ async function boot(): Promise<void> {
   const hint = document.createElement('p');
   hint.className = 'hint';
   hint.textContent =
-    'W/S or ↑/↓ throttle and brake · A/D or ←/→ steer · R respawn · M map · ` debug' +
+    'W/S or ↑/↓ throttle and brake (hold S when stopped to back up) · A/D or ←/→ steer · R respawn · M map · ` debug' +
     (free ? ' · C free camera (Q/E height)' : '');
   hint.hidden = true;
 

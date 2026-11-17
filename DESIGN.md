@@ -21,7 +21,11 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 | 8    | Touch controls, placeholder sounds, performance pass, report | Pending |
 
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
-terrain following, airtime off ramps and crests, and sliding along walls. The chase camera
+terrain following, airtime off ramps and crests, sliding along walls, and backing up: hold
+the brake at a standstill and after 0.35 s the rider paddles the bike backwards with their
+feet at 1.1 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
+go. It also publishes `telemetry` (speed, throttle, brake, airtime, landings, scraping)
+each step for the sound and, later, the cargo model. The chase camera
 with its anti-clipping spring arm is in. Still to do: keep or refine the handling the owner
 likes, wheelies, crash and respawn, a proper bike model, and the `RideSample` cargo signals.
 

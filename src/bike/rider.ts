@@ -20,6 +20,37 @@ const STICK = 0.06;
 const AIR_STEER = 0.35;
 /** Fraction of speed kept, per second, while scraping along a wall. */
 const SCRAPE_KEEP = 0.25;
+/**
+ * Backing up: hold the brake at a standstill and the rider paddles the bike backwards
+ * with their feet, at walking pace and no faster.
+ */
+const REVERSE_SPEED = 1.1;
+const REVERSE_ACCEL = 1.6;
+/** How long the brake is held at a standstill before the feet start paddling. */
+const REVERSE_DELAY = 0.35;
+/** Stopped means slower than this. */
+const STOPPED = 0.05;
+/** How much of the full steering rate paddling backwards allows. */
+const REVERSE_STEER = 0.45;
+
+/**
+ * What the rider is doing, refreshed every simulation step, for sound now and the cargo
+ * model later (see the `RideSample` in DESIGN.md).
+ */
+export interface RideTelemetry {
+  /** Metres per second along the heading; negative while backing up. */
+  speed: number;
+  throttle: number;
+  brake: number;
+  grounded: boolean;
+  /** Seconds off the ground so far, 0 when grounded. */
+  airtime: number;
+  /** Strongest landing since the last `takeLanding()`, as downward speed in m/s. */
+  landing: number;
+  /** 0..1, how hard the bike is scraping along a wall this step. */
+  scrape: number;
+  reversing: boolean;
+}
 
 export interface Pose {
   x: number;
@@ -36,6 +67,17 @@ export class Rider {
   private readonly body = new Group();
   private readonly hit: GroundHit = { y: 0, nx: 0, ny: 1, nz: 0 };
   private readonly moved = { x: 0, z: 0 };
+  readonly telemetry: RideTelemetry = {
+    speed: 0,
+    throttle: 0,
+    brake: 0,
+    grounded: true,
+    airtime: 0,
+    landing: 0,
+    scrape: 0,
+    reversing: false,
+  };
+  private stoppedFor = 0;
 
   private x = 0;
   private y = 0;
@@ -82,6 +124,7 @@ export class Rider {
     this.y = this.physics.groundAt(this.x, 200, this.z, 400, this.hit) ? this.hit.y : 0;
     this.speed = 0;
     this.vy = 0;
+    this.stoppedFor = 0;
     this.lean = 0;
     this.pitch = 0;
     this.grounded = true;
@@ -91,15 +134,31 @@ export class Rider {
   step(dt: number, input: RawInput): void {
     this.savePrevious();
 
-    const drive = this.grounded ? input.throttle * ACCEL - input.brake * BRAKE : 0;
-    this.speed += (drive - this.speed * DRAG) * dt;
-    this.speed = Math.min(MAX_SPEED, Math.max(0, this.speed));
+    const braking = input.brake > 0.5 && input.throttle < 0.1;
+    this.stoppedFor = Math.abs(this.speed) < STOPPED && braking ? this.stoppedFor + dt : 0;
+    const reversing =
+      this.grounded && braking && (this.speed < -STOPPED || this.stoppedFor > REVERSE_DELAY);
 
-    // Steering fades in with speed so the bike cannot spin on the spot.
-    const grip = Math.min(1, this.speed / 6) * (this.grounded ? 1 : AIR_STEER);
+    if (reversing) {
+      this.speed = Math.max(-REVERSE_SPEED, this.speed - REVERSE_ACCEL * dt);
+    } else if (this.speed < 0) {
+      // Feet down: rolling backwards stops as soon as the brake is let go.
+      this.speed = Math.min(0, this.speed + REVERSE_ACCEL * 3 * dt);
+    } else {
+      const drive = this.grounded ? input.throttle * ACCEL - input.brake * BRAKE : 0;
+      this.speed += (drive - this.speed * DRAG) * dt;
+      this.speed = Math.min(MAX_SPEED, Math.max(0, this.speed));
+    }
+
+    // Steering fades in with speed so the bike cannot spin on the spot. Pushed backwards,
+    // the turned front wheel swings the bike the other way, and only slowly.
+    const grip =
+      this.speed >= 0
+        ? Math.min(1, this.speed / 6) * (this.grounded ? 1 : AIR_STEER)
+        : -REVERSE_STEER * (-this.speed / REVERSE_SPEED);
     this.heading -= input.steer * TURN_RATE * grip * dt;
 
-    const targetLean = input.steer * MAX_LEAN * Math.min(1, this.speed / 14);
+    const targetLean = input.steer * MAX_LEAN * Math.min(1, Math.max(0, this.speed) / 14);
     this.lean += (targetLean - this.lean) * Math.min(1, 8 * dt);
 
     const sin = Math.sin(this.heading);
@@ -107,11 +166,16 @@ export class Rider {
     const dx = sin * this.speed * dt;
     const dz = cos * this.speed * dt;
 
+    let scrape = 0;
     if (this.physics.slideRider(this.x, this.y, this.z, dx, dz, this.moved)) {
       // Keep only the speed that still points where the wall let us go, and bleed some
       // off for the scrape.
       const wanted = Math.hypot(dx, dz);
       const along = wanted > 1e-6 ? (this.moved.x * dx + this.moved.z * dz) / (wanted * wanted) : 0;
+      scrape = Math.min(
+        1,
+        (Math.abs(this.speed) / 12) * (1 - Math.max(0, Math.min(1, along)) * 0.5),
+      );
       this.speed *= Math.max(0, Math.min(1, along)) * Math.pow(SCRAPE_KEEP, dt);
     }
     this.x += this.moved.x;
@@ -122,7 +186,12 @@ export class Rider {
     const found = this.physics.groundAt(this.x, this.y + 1.5, this.z, 60, this.hit);
     let targetPitch: number;
 
+    const wasGrounded = this.grounded;
+    const fallSpeed = -this.vy;
     if (found && this.hit.y >= ballisticY - STICK) {
+      if (!wasGrounded) {
+        this.telemetry.landing = Math.max(this.telemetry.landing, fallSpeed);
+      }
       this.grounded = true;
       this.y = this.hit.y;
       // Rate of climb of a point sliding over this surface at our speed. Using the
@@ -138,6 +207,22 @@ export class Rider {
       targetPitch = Math.atan2(this.vy, Math.max(4, this.speed)) * 0.6;
     }
     this.pitch += (targetPitch - this.pitch) * Math.min(1, 10 * dt);
+
+    const t = this.telemetry;
+    t.speed = this.speed;
+    t.throttle = input.throttle;
+    t.brake = input.brake;
+    t.grounded = this.grounded;
+    t.airtime = this.grounded ? 0 : t.airtime + dt;
+    t.scrape = scrape;
+    t.reversing = this.speed < -STOPPED;
+  }
+
+  /** The strongest landing since the last call, then forget it. */
+  takeLanding(): number {
+    const landing = this.telemetry.landing;
+    this.telemetry.landing = 0;
+    return landing;
   }
 
   /** Position the visuals between the last two simulation steps. */
