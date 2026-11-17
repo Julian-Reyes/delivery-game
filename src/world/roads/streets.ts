@@ -38,6 +38,10 @@ const TURNS = [-0.5, -0.25, 0, 0.25, 0.5];
 /** A new street heads straight out this far before it may turn, to get clear of its host. */
 const LEAVE_STEPS = 3;
 const LEAVE_TURNS = [-0.1, 0, 0.1];
+/** How far off square a crossroads street crosses its trunk. */
+const CROSSROAD_SKEW = 0.7;
+/** How fast a street must climb out of the cutting its trunk runs in, per metre. */
+const CUTTING_RECOVERY = 0.06;
 /** Deepest cutting or highest fill a growing street may need at any step. */
 const MAX_CUT = 3;
 /** Room between the edges of two roads for a row of houses (back to back or facing). */
@@ -222,6 +226,13 @@ export interface StreetOptions {
   trunks: readonly DesignedRoad[];
   /** How many street starts to try along each trunk, per 100 m. */
   density: number;
+  /**
+   * Grow a street off both sides of the same point, making four-way crossroads on the
+   * trunks, and skip the second generation of lanes off the new streets.
+   */
+  crossroads?: boolean;
+  /** Other roads already planned that new streets must keep clear of. */
+  avoid?: readonly DesignedRoad[];
   junctions: Junctions;
 }
 
@@ -279,6 +290,7 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
   const random = createRandom(options.seed * 48271 + 11);
   const index = new SegmentIndex();
   for (const trunk of options.trunks) index.addRoad(trunk, false);
+  for (const road of options.avoid ?? []) index.addRoad(road, road.kind === 'stairs');
   const added: DesignedRoad[] = [];
 
   const inside = (x: number, z: number, margin: number): boolean =>
@@ -296,7 +308,14 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
    * Grow one street from a point on `host`. Returns null if it came out too short or
    * could not be fitted.
    */
-  const grow = (host: DesignedRoad, start: RoadPoint, heading: number, kind: RoadKind) => {
+  const grow = (
+    host: DesignedRoad,
+    start: RoadPoint,
+    heading: number,
+    kind: RoadKind,
+    /** The other half of a crossroads, which this street may touch at its start. */
+    partner: DesignedRoad | null = null,
+  ) => {
     const spec = ROAD_KINDS[kind];
     const width = spec.width;
     const hostWidth = host.width ?? ROAD_KINDS[host.kind].width;
@@ -304,15 +323,24 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
       road: host,
       x: start.x,
       z: start.z,
-      radius: (width + hostWidth) / 2 + HOUSE_ROOM + 4,
+      // A diagonal crossing leaves its trunk at a narrow angle, so it stays close for
+      // longer before the two diverge.
+      radius:
+        ((width + hostWidth) / 2 + HOUSE_ROOM) /
+          (options.crossroads ? Math.cos(CROSSROAD_SKEW) : 1) +
+        4,
     };
+    const startAnchors: Anchor[] = partner
+      ? [startAnchor, { road: partner, x: start.x, z: start.z, radius: startAnchor.radius }]
+      : [startAnchor];
     // Most streets wander along the slope at a gentle grade; some climb.
     const targetGrade = (random() < 0.3 ? 0.6 : 0.15) * spec.maxGrade * (random() < 0.5 ? -1 : 1);
     const maxLength = 50 + random() * 130;
     const tip: Tip = { x: start.x, z: start.z, y: start.y, heading };
     // Main roads often run in a cutting; a street may start in it and climb out.
     const startCut = Math.abs(groundAt(start.x, start.z) - start.y);
-    const allowedCut = (along: number): number => Math.max(MAX_CUT, startCut + 1 - along * 0.15);
+    const allowedCut = (along: number): number =>
+      Math.max(MAX_CUT, startCut + 1 - along * CUTTING_RECOVERY);
     const controls: Control[] = [[start.x, start.z]];
     let length = 0;
 
@@ -330,7 +358,7 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
         );
         const y = tip.y + climb;
         if (Math.abs(ground - y) > allowedCut(length + STEP)) continue;
-        if (!clearOf(index, tip.x, tip.z, x, z, width, false, [startAnchor])) continue;
+        if (!clearOf(index, tip.x, tip.z, x, z, width, false, startAnchors)) continue;
         const score =
           Math.abs(ground - (tip.y + targetGrade * STEP)) + Math.abs(turn) * 2 + random() * 0.8;
         if (!best || score < best.score) best = { x, z, y, heading: h, score };
@@ -369,7 +397,7 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
           z: p.z,
           radius: (width + otherWidth) / 2 + HOUSE_ROOM + 4,
         };
-        if (!clearOf(index, tip.x, tip.z, p.x, p.z, width, false, [startAnchor, endAnchor]))
+        if (!clearOf(index, tip.x, tip.z, p.x, p.z, width, false, [...startAnchors, endAnchor]))
           continue;
         if (!end || run < Math.hypot(end.point.x - tip.x, end.point.z - tip.z))
           end = { road: s.road, point: p };
@@ -454,16 +482,29 @@ export function growStreets(plan: RoadPlan, options: StreetOptions): DesignedRoa
       next = travelled + spacing * (0.6 + random() * 0.8);
       if (bendAt(host.points, i) > 0.35 || !spacedFrom(host, p.x, p.z) || !inside(p.x, p.z, 8))
         continue;
-      const side = random() < 0.5 ? 1 : -1;
-      const out = headingAt(host.points, i) + side * (Math.PI / 2 + (random() - 0.5) * 0.5);
       const kind = kinds[Math.floor(random() * kinds.length)] ?? 'lane';
-      grow(host, p, out, kind);
+      const first = random() < 0.5 ? 1 : -1;
+      if (options.crossroads) {
+        // One street straight through the trunk, crossing it on a diagonal: square on, it
+        // would climb the full slope, steeper than any street may.
+        const out = headingAt(host.points, i) + first * (Math.PI / 2 - CROSSROAD_SKEW);
+        const half = grow(host, p, out, kind);
+        grow(host, p, out + Math.PI, kind, half);
+      } else {
+        const out = headingAt(host.points, i) + first * (Math.PI / 2 + (random() - 0.5) * 0.5);
+        grow(host, p, out, kind);
+      }
     }
   };
 
-  for (const trunk of options.trunks) sprout(trunk, ['secondary', 'lane', 'lane']);
+  for (const trunk of options.trunks) {
+    sprout(
+      trunk,
+      options.crossroads ? ['lane', 'lane', 'secondary'] : ['secondary', 'lane', 'lane'],
+    );
+  }
   // Second generation: lanes and alleys off the first streets.
-  for (const street of [...added]) sprout(street, ['lane', 'alley']);
+  if (!options.crossroads) for (const street of [...added]) sprout(street, ['lane', 'alley']);
 
   return added;
 }

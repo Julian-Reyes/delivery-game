@@ -156,6 +156,11 @@ Grown from a seed on top of the main roads, in three passes, each checked step b
 (on the ground, within its kind's grade and curve limits, inside the area, and far enough
 from every other road to leave a row of houses between):
 
+- **Cross streets** (`roads/crossings.ts`, first): straight streets cutting diagonally
+  across the main roads from one leg to another, where the grade allows; then
+  **crossroads**, a street grown off both sides of the same point on a main road, crossing
+  it on a 40° diagonal (square on would climb the whole 28% slope). About 15–20 junctions
+  per kilometre of main road, a few of them four-way.
 - **Terrace lanes** (`roads/terraces.ts`, 3 m): traced from contour lines of the ground
   every 5.5 m of height, smoothed, trimmed wherever they would crowd a road or bend too
   tightly, then joined at each end to the nearest road within reach by a short connector
@@ -168,6 +173,10 @@ from every other road to leave a row of houses between):
 - **Stairs**: straight flights between a road and another road at least 5 m higher, no
   steeper than 75%, with level landings at each end across the road's width and
   shoulder.
+
+Roads stacked close above one another on the slope get 6 m concrete retaining walls down
+their edges (the road skirts), so the lower road's bed never shows as a gap under the upper
+one.
 
 Anything joining a road runs level across that road's half-width and shoulder before
 climbing (`approachRun`), so it meets the flat bed the terrain cuts for the road. Where

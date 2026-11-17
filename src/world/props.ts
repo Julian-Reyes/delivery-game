@@ -3,6 +3,7 @@ import type { GeoBuilder, Vec3 } from './geo';
 import {
   AVENUE_Z_MAX,
   AVENUE_Z_MIN,
+  CORRIDOR_HALF,
   CROSS_STREETS,
   CURB,
   HALF,
@@ -158,7 +159,11 @@ function poleRuns(): PoleRun[] {
   }
   for (const street of CROSS_STREETS) {
     const points = [];
-    for (let x = -84; x <= 84; x += 28) points.push({ x, z: street.z - offset });
+    for (let x = -84; x <= 84; x += 28) {
+      // Step aside where a pole would land in a hill street crossing this one.
+      const blocked = HILL_STREETS_X.some((centre) => Math.abs(x - centre) < CORRIDOR_HALF + 1);
+      points.push({ x: blocked ? x + 10 : x, z: street.z - offset });
+    }
     runs.push({ points, px: 0, pz: 1 });
   }
   const avenue = [];

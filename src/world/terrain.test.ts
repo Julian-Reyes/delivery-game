@@ -143,7 +143,7 @@ describe('Terrain', () => {
             expect(gap, `${edge.kind} ${edge.id} at ${x.toFixed(1)}, ${z.toFixed(1)}`).toBeLessThan(
               limit,
             );
-            expect(gap).toBeGreaterThan(-2.4);
+            expect(gap).toBeGreaterThan(-5.9);
           }
         }
       }

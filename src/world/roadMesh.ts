@@ -4,9 +4,9 @@ import { inCity } from './terrain';
 
 /**
  * Road surfaces for everything outside the original city, built straight from the road
- * graph: a strip along each centreline, a skirt down each side so a road on a fill never
- * shows daylight underneath, and a disc at every turning pad. Plain colours only for now;
- * the layout is what matters at this stage.
+ * graph: a strip along each centreline, a concrete retaining wall down each side (so a road
+ * perched above the lane below it, or on a fill, never shows daylight underneath), and a
+ * disc at every turning pad.
  */
 
 const SURFACE_COLORS: Record<RoadKind, number> = {
@@ -18,8 +18,8 @@ const SURFACE_COLORS: Record<RoadKind, number> = {
   alley: 0x9d978c,
   stairs: 0xb0aaa0,
 };
-const SKIRT = 0x6f665a;
-const SKIRT_DEPTH = 2.5;
+const SKIRT = 0x8d877c;
+const SKIRT_DEPTH = 6;
 const PAD_SEGMENTS = 20;
 
 export interface RoadGeometry {
