@@ -114,7 +114,7 @@ are not.
 - **Edges:** steep wooded slopes with walls hidden in them, backdrop hills further out, fog.
 
 Order of work: road graph and debug map (done), terrain system and extended world (done), Area 1
-main roads (done), Area 1 small streets, Area 1 buildings and delivery spots, then Area 2.
+main roads (done), Area 1 small streets (done), Area 1 buildings and delivery spots, then Area 2.
 
 ### Terrain
 
@@ -149,6 +149,38 @@ city) to entrance nodes on the city's edge. From there (`roads/hillside.ts`):
 - **Rua da Subida** (main) climbs diagonally from the east entrance and meets the
   Estrada's second leg square on, west of the ravine, where the two are at the same
   height. Up one, down the other makes a loop through the city.
+
+### Area 1 small streets
+
+Grown from a seed on top of the main roads, in three passes, each checked step by step
+(on the ground, within its kind's grade and curve limits, inside the area, and far enough
+from every other road to leave a row of houses between):
+
+- **Terrace lanes** (`roads/terraces.ts`, 3 m): traced from contour lines of the ground
+  every 5.5 m of height, smoothed, trimmed wherever they would crowd a road or bend too
+  tightly, then joined at each end to the nearest road within reach by a short connector
+  at up to 22%, or ended in a turning pad. A lane with no way in is dropped. They are
+  level, so they sit on the ground with almost no cut or fill: the shelves houses are
+  built on.
+- **Grown streets** (`roads/streets.ts`): secondary streets, lanes and alleys that set
+  off square from a road, then wander in 8 m steps along the slope at a gentle target
+  grade, ending by joining a road ahead or in a turning pad.
+- **Stairs**: straight flights between a road and another road at least 5 m higher, no
+  steeper than 75%, with level landings at each end across the road's width and
+  shoulder.
+
+Anything joining a road runs level across that road's half-width and shoulder before
+climbing (`approachRun`), so it meets the flat bed the terrain cuts for the road. Where
+two beds overlap, the lower wins, so ground never rises through a road surface.
+
+Seed 1 gives about 1 km of main road, 1 km of lanes, a little secondary street and 80 m of
+stairs; ten seeds all validate cleanly. Generating the network takes about 200 ms on a
+desktop. Autopilot rides from the city to four dead-end pads and along the longest lane
+all arrived, within 2 m of the centreline and never more than 0.27 s in the air.
+
+Known gaps: stairs are sparse (they need a clear straight line to a road well uphill);
+blocks between roads are still large in places; the autopilot follows whole edges, so it
+rides to the end of the last one rather than stopping mid-way.
 
 `roads/design.ts` holds the tools: `filletPath` (straights joined by arcs, hairpins as two
 corners), `fitProfile` (follows the smoothed ground within a grade limit, smoothing the

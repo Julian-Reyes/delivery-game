@@ -1,5 +1,6 @@
 import { HALF, NORTH_EXITS_X, heightAt } from '../layout';
 import type { RoadPlan, Control, DesignedRoad } from './design';
+import { approachRun } from './streets';
 
 /**
  * Area 1: the favela on the hillside behind the city. Its two main roads decide how the
@@ -158,6 +159,7 @@ export function planHillsideMainRoads(
     groundAt,
     startY: heightAt(EAST_EXIT, HALF),
     endY: join.y,
+    level: { end: approachRun(estrada) },
   });
   return { estrada, subida };
 }

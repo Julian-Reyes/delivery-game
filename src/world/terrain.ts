@@ -36,13 +36,18 @@ export const HEADLAND = { x0: -620, x1: -200, z0: -230, z1: 160 } as const;
 /** How far outside the city square the ground takes to blend into the hills. */
 const CITY_BLEND = 40;
 /** Road surfaces sit this far above the carved ground, so the ground never shows through. */
-export const ROAD_SINK = 0.15;
+export const ROAD_SINK = 0.25;
+/** Stairs sink deeper, so the bends between their landings and flights stay buried. */
+const STAIR_SINK = 0.6;
 /**
  * Flat strip either side of a road before the cut or fill slope starts. One cell diagonal
  * wide, so every terrain triangle under any part of a road is entirely flat bed and none
  * of the bank can poke up through the road's edge.
  */
-const SHOULDER = TERRAIN_CELL * Math.SQRT2;
+export const ROAD_SHOULDER = TERRAIN_CELL * Math.SQRT2;
+const SHOULDER = ROAD_SHOULDER;
+/** Stairs get the same one-diagonal bed as roads, so no bank pokes up through a flight. */
+const STAIR_SHOULDER = ROAD_SHOULDER;
 /** Cut and fill slopes: rise per metre of distance from the road. */
 const BANK_SLOPE = 1.1;
 const BANK_REACH = 45;
@@ -241,17 +246,22 @@ export function buildTerrain(seed: number, roads: RoadGraph): Terrain {
     }
   }
 
-  // Per vertex: the band the banks allow, and the road it sits under (closest wins).
+  // Per vertex: the band the banks allow, and the bed of the road or stair it sits under.
+  // Where two beds overlap (a junction, a stair landing) the lower one wins: ground below a
+  // road edge is hidden by its skirt, ground above it would show through.
   const low = new Float32Array(count).fill(-Infinity);
   const high = new Float32Array(count).fill(Infinity);
-  const under = new Float32Array(count).fill(NaN);
-  const underDistance = new Float32Array(count).fill(Infinity);
+  const under = new Float32Array(count).fill(Infinity);
 
   for (const edge of roads.edges) {
     // The city builds its own ground.
     if (edge.area === 'city') continue;
     if (horizontalLength(edge.points) === 0) continue;
-    const core = edge.width / 2 + SHOULDER;
+    const stairs = edge.kind === 'stairs';
+    const core = edge.width / 2 + (stairs ? STAIR_SHOULDER : SHOULDER);
+    // Along one road the nearest point sets the bed (a graded road's bed follows its
+    // grade); only between different roads does the lower bed win.
+    const nearest = new Map<number, { distance: number; y: number }>();
     const reach = core + BANK_REACH;
     for (let i = 1; i < edge.points.length; i++) {
       const a = edge.points[i - 1];
@@ -269,23 +279,24 @@ export function buildTerrain(seed: number, roads: RoadGraph): Terrain {
           if (Math.abs(x) <= HALF && Math.abs(z) <= HALF) continue;
           const { distance, t } = distanceToSegment(x, z, a.x, a.z, b.x, b.z);
           if (distance > reach) continue;
-          const y = a.y + (b.y - a.y) * t - ROAD_SINK;
+          const y = a.y + (b.y - a.y) * t - (stairs ? STAIR_SINK : ROAD_SINK);
           const index = iz * (cols + 1) + ix;
           const bank = Math.max(0, distance - core) * BANK_SLOPE;
           low[index] = Math.max(low[index] ?? -Infinity, y - bank);
           high[index] = Math.min(high[index] ?? Infinity, y + bank);
-          if (distance <= core && distance < (underDistance[index] ?? Infinity)) {
-            underDistance[index] = distance;
-            under[index] = y;
+          if (distance <= core) {
+            const best = nearest.get(index);
+            if (!best || distance < best.distance) nearest.set(index, { distance, y });
           }
         }
       }
     }
+    for (const [index, { y }] of nearest) under[index] = Math.min(under[index] ?? Infinity, y);
   }
 
   for (let index = 0; index < count; index++) {
-    const bed = under[index] ?? NaN;
-    if (!Number.isNaN(bed)) {
+    const bed = under[index] ?? Infinity;
+    if (Number.isFinite(bed)) {
       heights[index] = bed;
       continue;
     }

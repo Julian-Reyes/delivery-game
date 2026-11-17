@@ -17,11 +17,13 @@ const SPACING = 2;
  * control point is a corner rounded with its own radius (or `radius`). Hairpins are two
  * corners close together. Throws if a corner's arc does not fit between its neighbours.
  */
-export function filletPath(
-  controls: readonly Control[],
-  radius: number,
-): { x: number; z: number }[] {
+export function filletPath(given: readonly Control[], radius: number): { x: number; z: number }[] {
   const out: { x: number; z: number }[] = [];
+  // A repeated control point has no direction and would poison every corner after it.
+  const controls = given.filter((c, i) => {
+    const previous = given[i - 1];
+    return !previous || Math.hypot(c[0] - previous[0], c[1] - previous[1]) > 0.01;
+  });
   const first = controls[0];
   if (!first) return out;
 
@@ -134,6 +136,7 @@ export function fitProfile(
   maxGrade: number,
   startY?: number,
   endY?: number,
+  level: { start?: number; end?: number } = {},
 ): number[] {
   const n = path.length;
   const distance: number[] = [0];
@@ -160,23 +163,32 @@ export function fitProfile(
     return sum / weight;
   });
 
+  // Pinned ends, held level for `level.start` / `level.end` metres: a road joining another
+  // runs flat across the other's width and shoulder before it starts to climb.
+  const total = distance[n - 1] ?? 0;
+  const pin = (v: number[]): void => {
+    for (let i = 0; i < n; i++) {
+      const d = distance[i] ?? 0;
+      if (startY !== undefined && d <= (level.start ?? 0)) v[i] = startY;
+      if (endY !== undefined && total - d <= (level.end ?? 0)) v[i] = endY;
+    }
+  };
   const limit = (values: number[]): number[] => {
     const v = values.slice();
-    if (startY !== undefined) v[0] = startY;
-    if (endY !== undefined) v[n - 1] = endY;
+    pin(v);
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 1; i < n; i++) {
         const step = ((distance[i] ?? 0) - (distance[i - 1] ?? 0)) * maxGrade;
         const prev = v[i - 1] ?? 0;
         v[i] = Math.min(prev + step, Math.max(prev - step, v[i] ?? 0));
       }
-      if (endY !== undefined) v[n - 1] = endY;
+      pin(v);
       for (let i = n - 2; i >= 0; i--) {
         const step = ((distance[i + 1] ?? 0) - (distance[i] ?? 0)) * maxGrade;
         const next = v[i + 1] ?? 0;
         v[i] = Math.min(next + step, Math.max(next - step, v[i] ?? 0));
       }
-      if (startY !== undefined) v[0] = startY;
+      pin(v);
     }
     return v;
   };
@@ -224,6 +236,8 @@ export class RoadPlan {
       groundAt: (x: number, z: number) => number;
       startY?: number;
       endY?: number;
+      /** Metres held level at each pinned end. */
+      level?: { start?: number; end?: number };
       maxGrade?: number;
     },
   ): DesignedRoad {
@@ -235,6 +249,7 @@ export class RoadPlan {
       options.maxGrade ?? spec.maxGrade * 0.97,
       options.startY,
       options.endY,
+      options.level,
     );
     return this.add({
       name: options.name,

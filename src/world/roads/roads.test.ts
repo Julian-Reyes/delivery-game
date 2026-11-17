@@ -252,6 +252,26 @@ describe('the hillside network', () => {
     expect(east?.edges.some((id) => graph.getEdge(id).name === 'Rua da Subida')).toBe(true);
   });
 
+  it('has terrace lanes, stairs and turning spaces at its dead ends', () => {
+    const length = (kind: string): number =>
+      hillside.filter((edge) => edge.kind === kind).reduce((sum, edge) => sum + edge.length, 0);
+    expect(length('lane')).toBeGreaterThan(800);
+    expect(length('stairs')).toBeGreaterThan(50);
+    for (const node of graph.nodes) {
+      const rideable = graph.edgesAt(node.id).filter((id) => isRideable(graph.getEdge(id)));
+      const hill = graph.edgesAt(node.id).some((id) => graph.getEdge(id).area === 'hillside');
+      if (hill && rideable.length === 1) expect(node.pad).toBeGreaterThan(3.6);
+    }
+  });
+
+  it('only puts stairs between two roads', () => {
+    for (const edge of hillside.filter((e) => e.kind === 'stairs')) {
+      for (const end of [edge.from, edge.to]) {
+        expect(graph.edgesAt(end).some((id) => isRideable(graph.getEdge(id)))).toBe(true);
+      }
+    }
+  });
+
   it('passes every check for many seeds', () => {
     for (let seed = 1; seed <= 10; seed++) {
       expect(validateGraph(buildRoadNetwork(seed), SPAWN.x, SPAWN.z), `seed ${seed}`).toEqual([]);

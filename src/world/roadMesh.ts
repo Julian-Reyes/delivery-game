@@ -19,7 +19,7 @@ const SURFACE_COLORS: Record<RoadKind, number> = {
   stairs: 0xb0aaa0,
 };
 const SKIRT = 0x6f665a;
-const SKIRT_DEPTH = 1.6;
+const SKIRT_DEPTH = 2.5;
 const PAD_SEGMENTS = 20;
 
 export interface RoadGeometry {
