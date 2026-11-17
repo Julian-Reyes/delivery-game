@@ -114,7 +114,7 @@ are not.
 - **Edges:** steep wooded slopes with walls hidden in them, backdrop hills further out, fog.
 
 Order of work: road graph and debug map (done), terrain system and extended world (done), Area 1
-main roads (done), Area 1 small streets (done), Area 1 buildings and delivery spots, then Area 2.
+main roads (done), Area 1 small streets (done), Area 1 buildings and delivery spots (done), then Area 2.
 
 ### Terrain
 
@@ -181,6 +181,37 @@ all arrived, within 2 m of the centreline and never more than 0.27 s in the air.
 Known gaps: stairs are sparse (they need a clear straight line to a road well uphill);
 blocks between roads are still large in places; the autopilot follows whole edges, so it
 rides to the end of the last one rather than stopping mid-way.
+
+### Area 1 buildings and delivery spots
+
+`houses.ts` (pure) plans the footprints; `houseMesh.ts` draws them. Each house is a
+rotated rectangle placed only if it is inside the area, clear of every road surface and
+turning pad, not over a neighbour (walls may touch), and on buildable ground:
+
+- **Front rows** along both sides of every street and stairway, facing it, 4–10 m wide,
+  with a footpath gap now and then; every street's front row is placed before any back
+  row so no street loses its frontage.
+- **Two back rows** behind each, also facing the street, reached by the gaps between.
+- **Infill** on a shuffled jittered 4.5 m grid, facing downhill, only within 35 m of a
+  street or stair, so the favela has a ragged edge with open hillside beyond. A few
+  small courtyards are kept open first.
+- **On the ground:** the floor is at the front door; the foundation goes down to the
+  lowest point under the footprint (up to 8 m on the downhill side); a house with the
+  hill rising behind it gains storeys (up to 5) until its roof clears the slope.
+
+Placeholder look: one coloured block (brick, bare concrete or paint) on a grey foundation
+with a flat roof slab, merged into the city mesh, and a box collider each. About 1,000
+houses on seed 1; the full view is about 32 draw calls and 160k triangles.
+
+Delivery spots (`DeliverySpot`): four pickups at shops on the main roads, spread 90 m
+apart, and sixteen drop-offs, half at doors on rideable streets and half where you park on
+the nearest rideable road and walk (stairs and paths) at most 90 m; walk-up doors are at
+most 20 m from a path. Every spot is checked reachable by bike from the spawn. Green
+(pickup) and blue (drop-off) posts mark them in the world, and the map shows them with a
+dashed line from where you park.
+
+With the houses in, autopilot rides from the city to the top square, three dead-end
+pads and three drop-off doors all arrived, none stuck, within 2 m of the centreline.
 
 `roads/design.ts` holds the tools: `filletPath` (straights joined by arcs, hairpins as two
 corners), `fitProfile` (follows the smoothed ground within a grade limit, smoothing the

@@ -34,6 +34,8 @@ import {
   addVegetation,
 } from './props';
 import type { SolidBox } from './props';
+import { addHouses } from './houseMesh';
+import type { HousePlan } from './houses';
 import { buildRoadGeometry } from './roadMesh';
 import type { RoadGraph } from './roads/graph';
 import type { Terrain } from './terrain';
@@ -145,6 +147,7 @@ export class World {
     anisotropy: number,
     terrain: Terrain,
     roads: RoadGraph,
+    favela: HousePlan,
     seed: number,
   ) {
     const random = createRandom(2024);
@@ -187,6 +190,7 @@ export class World {
     addBarTables(city, random);
     addBeach(city, solids, random);
     addBackdrop(city, solids, random);
+    addHouses(city, solids, favela.houses, favela.spots);
 
     // Ground: one mesh per surface texture.
     const textures = createGroundTextures(anisotropy);

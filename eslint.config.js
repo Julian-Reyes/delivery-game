@@ -26,6 +26,7 @@ export default tseslint.config(
       'src/world/layout.ts',
       'src/world/random.ts',
       'src/world/terrain.ts',
+      'src/world/houses.ts',
       'src/world/roads/**/*.ts',
     ],
     rules: {

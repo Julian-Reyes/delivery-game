@@ -1,6 +1,7 @@
 import { isRideable } from '../world/roads/graph';
 import type { AreaId, RoadGraph } from '../world/roads/graph';
 import type { RoadIssue } from '../world/roads/validate';
+import type { DeliverySpot, House } from '../world/houses';
 
 /**
  * Overhead map of the road graph for checking the layout: elevation with contour lines,
@@ -21,6 +22,9 @@ const TEXT = {
   ride: 'Motorcycle',
   walk: 'Pedestrian only',
   entrance: 'Area entrance',
+  houses: 'Houses',
+  pickup: 'Pickup (shop)',
+  dropoff: 'Drop-off',
   issues: (count: number) => (count === 0 ? 'No layout problems' : `${count} layout problems`),
   areas: {
     city: 'City',
@@ -47,6 +51,8 @@ const RAMP: readonly [number, [number, number, number]][] = [
   [160, [176, 164, 150]],
 ];
 const CONTOUR_STEP = 5;
+const PICKUP = '#2fbf71';
+const DROPOFF = '#3b82f6';
 const ELEVATION_METRES_PER_PIXEL = 1.5;
 
 function rampColor(height: number): [number, number, number] {
@@ -85,6 +91,8 @@ export class DebugMap {
   private riderX = 0;
   private riderZ = 0;
   private riderHeading = 0;
+  private houses: readonly House[] = [];
+  private spots: readonly DeliverySpot[] = [];
 
   constructor(
     container: HTMLElement,
@@ -125,6 +133,12 @@ export class DebugMap {
     }
   }
 
+  /** Building footprints and delivery spots to draw under and over the roads. */
+  setFavela(houses: readonly House[], spots: readonly DeliverySpot[]): void {
+    this.houses = houses;
+    this.spots = spots;
+  }
+
   /** Call once per rendered frame; does nothing while the map is hidden. */
   update(x: number, z: number, heading: number): void {
     this.riderX = x;
@@ -153,6 +167,9 @@ export class DebugMap {
     row('border-top:3px solid #ddd', TEXT.ride);
     row('border-top:3px dashed #ddd', TEXT.walk);
     row('border:2px solid #fff;border-radius:50%', TEXT.entrance);
+    row('background:#7a6a5a', TEXT.houses);
+    row(`background:${PICKUP};border-radius:2px`, TEXT.pickup);
+    row(`background:${DROPOFF};border-radius:50%`, TEXT.dropoff);
     row('background:#ff3b30', TEXT.issues(this.issues.length));
     return legend;
   }
@@ -244,6 +261,23 @@ export class DebugMap {
     context.drawImage(this.elevation, 0, 0, x1 - x0, z1 - z0);
     context.restore();
 
+    // Houses under the roads, darker the taller they are.
+    for (const house of this.houses) {
+      const fx = Math.sin(house.yaw);
+      const fz = Math.cos(house.yaw);
+      const w = house.width / 2;
+      const d = house.depth / 2;
+      const shade = Math.max(0, 120 - house.floors * 14);
+      context.fillStyle = `rgb(${shade + 40},${shade + 26},${shade + 12})`;
+      context.beginPath();
+      context.moveTo(house.x + fz * w + fx * d, house.z - fx * w + fz * d);
+      context.lineTo(house.x + fz * w - fx * d, house.z - fx * w - fz * d);
+      context.lineTo(house.x - fz * w - fx * d, house.z + fx * w - fz * d);
+      context.lineTo(house.x - fz * w + fx * d, house.z + fx * w + fz * d);
+      context.closePath();
+      context.fill();
+    }
+
     const minLine = 1.5 * this.scale;
     context.lineCap = 'round';
     context.lineJoin = 'round';
@@ -286,6 +320,29 @@ export class DebugMap {
         context.arc(node.x, node.z, node.pad, 0, Math.PI * 2);
         context.stroke();
       }
+    }
+
+    // Delivery spots, with a line to where you leave the bike when it is a walk.
+    const mark = Math.max(5 * this.scale, 2.5);
+    for (const spot of this.spots) {
+      if (spot.walk > 0) {
+        context.strokeStyle = 'rgba(255,255,255,0.8)';
+        context.lineWidth = 1.2 * this.scale;
+        context.setLineDash([3 * this.scale, 2 * this.scale]);
+        context.beginPath();
+        context.moveTo(spot.parkX, spot.parkZ);
+        context.lineTo(spot.x, spot.z);
+        context.stroke();
+        context.setLineDash([]);
+      }
+      context.fillStyle = spot.kind === 'pickup' ? PICKUP : DROPOFF;
+      context.strokeStyle = '#000';
+      context.lineWidth = 1.2 * this.scale;
+      context.beginPath();
+      if (spot.kind === 'pickup') context.rect(spot.x - mark, spot.z - mark, mark * 2, mark * 2);
+      else context.arc(spot.x, spot.z, mark, 0, Math.PI * 2);
+      context.fill();
+      context.stroke();
     }
 
     context.strokeStyle = '#ff3b30';

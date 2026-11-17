@@ -15,7 +15,8 @@ import { SPAWN } from './world/layout';
 import { isRideable, nearestOnGraph, pointAlong } from './world/roads/graph';
 import { DEFAULT_MAP_SEED, buildRoadNetwork } from './world/roads/network';
 import { validateGraph } from './world/roads/validate';
-import { WORLD, buildTerrain } from './world/terrain';
+import { planHouses } from './world/houses';
+import { HILLSIDE, WORLD, buildTerrain } from './world/terrain';
 import { World } from './world/world';
 import './style.css';
 
@@ -68,10 +69,19 @@ async function boot(): Promise<void> {
   const roadIssues = validateGraph(roads, SPAWN.x, SPAWN.z);
   if (roadIssues.length > 0) console.warn(`Road layout (seed ${seed}):`, roadIssues);
   const terrain = buildTerrain(seed, roads);
+  const favela = planHouses({
+    seed,
+    area: { area: 'hillside', ...HILLSIDE },
+    roads,
+    terrain,
+    start: SPAWN,
+    pickups: 4,
+    dropoffs: 16,
+  });
 
   const physics = await Physics.create();
   const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  const world = new World(physics, anisotropy, terrain, roads, seed);
+  const world = new World(physics, anisotropy, terrain, roads, favela, seed);
   const rider = new Rider(physics, SPAWN);
   world.scene.add(rider.object);
   const chase = new ChaseCamera(physics);
@@ -101,6 +111,7 @@ async function boot(): Promise<void> {
     roadIssues,
     dropOnRoad,
   );
+  map.setFavela(favela.houses, favela.spots);
 
   const hint = document.createElement('p');
   hint.className = 'hint';
@@ -131,7 +142,9 @@ async function boot(): Promise<void> {
     );
     input.addSource(autopilot);
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
-    Object.assign(window, { __game: { rider, chase, free, world, roads, terrain, autopilot } });
+    Object.assign(window, {
+      __game: { rider, chase, free, world, roads, terrain, favela, autopilot },
+    });
   }
 
   let frameDt = 0;
