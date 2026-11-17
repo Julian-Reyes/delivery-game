@@ -1,6 +1,7 @@
 import { BoxGeometry, Group, Mesh, MeshLambertMaterial } from 'three';
 import type { RawInput } from '../input/actions';
 import type { GroundHit, Physics } from '../physics/physics';
+import { createEngine, stepEngine } from '../sim/engine';
 
 /**
  * Placeholder rider: the arcade handling from the first sandbox, now following the terrain,
@@ -78,6 +79,8 @@ export class Rider {
     reversing: false,
   };
   private stoppedFor = 0;
+  /** Revs, gear and load, for the engine sound. */
+  readonly engine = createEngine();
 
   private x = 0;
   private y = 0;
@@ -216,6 +219,11 @@ export class Rider {
     t.airtime = this.grounded ? 0 : t.airtime + dt;
     t.scrape = scrape;
     t.reversing = this.speed < -STOPPED;
+    stepEngine(
+      this.engine,
+      { speed: this.speed, throttle: input.throttle, grounded: this.grounded },
+      dt,
+    );
   }
 
   /** The strongest landing since the last call, then forget it. */

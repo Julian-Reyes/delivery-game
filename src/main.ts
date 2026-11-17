@@ -1,3 +1,4 @@
+import { BikeAudio } from './audio/bikeAudio';
 import { ChaseCamera } from './bike/chaseCamera';
 import { Rider } from './bike/rider';
 import { BRAND } from './brand';
@@ -11,7 +12,7 @@ import { InputManager } from './input/inputManager';
 import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
 import { DebugMap } from './ui/debugMap';
-import { SPAWN } from './world/layout';
+import { HALF, SPAWN, surfaceAt } from './world/layout';
 import { isRideable, nearestOnGraph, pointAlong } from './world/roads/graph';
 import { DEFAULT_MAP_SEED, buildRoadNetwork } from './world/roads/network';
 import { validateGraph } from './world/roads/validate';
@@ -123,10 +124,13 @@ async function boot(): Promise<void> {
   const titleCard = buildTitleCard();
   app.append(titleCard, hint);
 
+  const audio = new BikeAudio();
   let riding = false;
   const startRiding = (): void => {
     if (riding) return;
     riding = true;
+    // Starting to ride is the user gesture browsers require before any sound.
+    audio.start();
     titleCard.remove();
     hint.hidden = false;
   };
@@ -143,7 +147,7 @@ async function boot(): Promise<void> {
     input.addSource(autopilot);
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
     Object.assign(window, {
-      __game: { rider, chase, free, world, roads, terrain, favela, autopilot },
+      __game: { rider, chase, free, world, roads, terrain, favela, autopilot, audio },
     });
   }
 
@@ -179,6 +183,9 @@ async function boot(): Promise<void> {
       world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);
       renderer.render(world.scene, camera);
       map.update(rider.pose.x, rider.pose.z, rider.pose.heading);
+      const { x, z } = rider.pose;
+      const cobbles = Math.abs(x) < HALF && Math.abs(z) < HALF && surfaceAt(x, z) === 'cobble';
+      audio.update(frameDt, rider.telemetry, rider.engine, cobbles, rider.takeLanding());
     },
     stats(frameMs, cpuMs): void {
       overlay.record(frameMs, cpuMs);

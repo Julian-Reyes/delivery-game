@@ -295,7 +295,8 @@ towards top-down the higher it goes and turns the fog off.
 - three.js, TypeScript (strict), Vite. No UI framework; HUD and menus are DOM/CSS.
 - `@dimforge/rapier3d-compat` for collision and queries only.
 - Vitest for unit tests, ESLint + typescript-eslint + Prettier.
-- No asset files yet: geometry in code, WebAudio-synthesized sounds, system fonts.
+- No asset files yet: geometry in code, WebAudio-synthesized sounds, canvas-painted
+  textures, system fonts.
 
 ## Folder structure
 
@@ -305,7 +306,7 @@ src/
   main.ts      boot, screen switching
   core/        fixed-step loop, renderer setup, perf caps, debug overlay
   input/       actions + keyboard, gamepad, touch sources
-  sim/         pure logic: cargo, pay, orders, tuning (+ tests). No three.js/Rapier/DOM.
+  sim/         pure logic: engine, cargo, pay, orders, tuning (+ tests). No three.js/Rapier/DOM.
   physics/     Rapier world, colliders, queries
   bike/        controller, bike mesh, camera rig
   world/       neighborhood layout, merged geometry, lighting, fog
@@ -317,6 +318,23 @@ src/
 ```
 
 Folders are created when their step is built.
+
+## Sound
+
+Synthesised with the Web Audio API (`audio/bikeAudio.ts`), no recordings. The engine is
+driven by a pure engine and gearbox model (`sim/engine.ts`, numbers in `sim/tuning.ts`): a
+150 cc single with five gears, revs tied to road speed through the gear, a slipping
+clutch to pull away, shifts up near the top under power (never with the throttle shut)
+and down as the revs sag, a 0.2 s throttle cut per shift, and free revving in the air.
+
+The sound is a single cylinder firing every second revolution: a pulse-spectrum
+oscillator at the firing rate (12 Hz putt-putt at idle, about 75 Hz at the redline), noise
+pulsed at the same rate for roughness, a soft clipper and a low-pass filter that open with
+throttle so it barks under load and goes muffled on the overrun, and a few exhaust pops
+when the throttle snaps shut at high revs. Also wind with speed, tyre squeal under hard
+braking, a scrape along walls, a thump on landing, cobblestone rumble, and foot scuffs
+while backing up. Audio starts with the first click or key press (browsers require a
+gesture) and suspends while the tab is hidden.
 
 ## Physics approach
 
