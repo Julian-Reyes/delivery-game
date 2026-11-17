@@ -1,4 +1,5 @@
-import { BoxGeometry, Group, Mesh, MeshLambertMaterial } from 'three';
+import { Group } from 'three';
+import { BikeModel } from './bikeModel';
 import type { RawInput } from '../input/actions';
 import type { GroundHit, Physics } from '../physics/physics';
 import { createEngine, stepEngine } from '../sim/engine';
@@ -25,14 +26,20 @@ const SCRAPE_KEEP = 0.25;
  * Backing up: hold the brake at a standstill and the rider paddles the bike backwards
  * with their feet, at walking pace and no faster.
  */
-const REVERSE_SPEED = 1.1;
-const REVERSE_ACCEL = 1.6;
+const REVERSE_SPEED = 1.6;
+const REVERSE_ACCEL = 2.2;
 /** How long the brake is held at a standstill before the feet start paddling. */
 const REVERSE_DELAY = 0.35;
 /** Stopped means slower than this. */
 const STOPPED = 0.05;
 /** How much of the full steering rate paddling backwards allows. */
 const REVERSE_STEER = 0.45;
+/** How far the bars turn on full lock: a lot at walking pace, a touch at speed. */
+const BAR_LOCK_SLOW = 0.55;
+const BAR_LOCK_FAST = 0.08;
+const WHEEL_RADIUS = 0.3;
+/** Below this speed the rider puts their feet down. */
+const FEET_DOWN_SPEED = 1.8;
 
 /**
  * What the rider is doing, refreshed every simulation step, for sound now and the cargo
@@ -66,6 +73,7 @@ export class Rider {
   readonly pose: Pose = { x: 0, y: 0, z: 0, heading: 0 };
 
   private readonly body = new Group();
+  private readonly model = new BikeModel();
   private readonly hit: GroundHit = { y: 0, nx: 0, ny: 1, nz: 0 };
   private readonly moved = { x: 0, z: 0 };
   readonly telemetry: RideTelemetry = {
@@ -98,6 +106,13 @@ export class Rider {
   private prevHeading = 0;
   private prevLean = 0;
   private prevPitch = 0;
+  private bars = 0;
+  private prevBars = 0;
+  private wheel = 0;
+  private prevWheel = 0;
+  private feetDown = 1;
+  private prevFeetDown = 1;
+  private paddle = 0;
 
   constructor(
     private readonly physics: Physics,
@@ -224,6 +239,16 @@ export class Rider {
       { speed: this.speed, throttle: input.throttle, grounded: this.grounded },
       dt,
     );
+
+    // What the model shows: bars turned by the steering, wheels rolling, feet down when
+    // nearly stopped, paddling when backing up.
+    const lock =
+      BAR_LOCK_FAST + (BAR_LOCK_SLOW - BAR_LOCK_FAST) * Math.max(0, 1 - Math.abs(this.speed) / 10);
+    this.bars += (input.steer * lock - this.bars) * Math.min(1, 10 * dt);
+    if (this.grounded) this.wheel += (this.speed / WHEEL_RADIUS) * dt;
+    const down = this.grounded && Math.abs(this.speed) < FEET_DOWN_SPEED ? 1 : 0;
+    this.feetDown += (down - this.feetDown) * Math.min(1, 6 * dt);
+    if (this.speed < -STOPPED) this.paddle += -this.speed * 5 * dt;
   }
 
   /** The strongest landing since the last call, then forget it. */
@@ -246,6 +271,12 @@ export class Rider {
     // Positive rotation about x dips the nose, so pitch-up is negative.
     this.body.rotation.x = -(this.prevPitch + (this.pitch - this.prevPitch) * alpha);
     this.body.rotation.z = this.prevLean + (this.lean - this.prevLean) * alpha;
+    this.model.update({
+      steer: this.prevBars + (this.bars - this.prevBars) * alpha,
+      wheel: this.prevWheel + (this.wheel - this.prevWheel) * alpha,
+      feetDown: this.prevFeetDown + (this.feetDown - this.prevFeetDown) * alpha,
+      paddle: this.speed < -STOPPED ? this.paddle : null,
+    });
   }
 
   private savePrevious(): void {
@@ -255,28 +286,13 @@ export class Rider {
     this.prevHeading = this.heading;
     this.prevLean = this.lean;
     this.prevPitch = this.pitch;
+    this.prevBars = this.bars;
+    this.prevWheel = this.wheel;
+    this.prevFeetDown = this.feetDown;
   }
 
   private buildMesh(): void {
-    const paint = new MeshLambertMaterial({ color: 0xff5a3c });
-    const dark = new MeshLambertMaterial({ color: 0x1d2530 });
-    const bag = new MeshLambertMaterial({ color: 0x1fb5a8 });
-
-    const frame = new Mesh(new BoxGeometry(0.4, 0.5, 1.7), paint);
-    frame.position.y = 0.75;
-    const wheels = new Mesh(new BoxGeometry(0.16, 0.62, 2.1), dark);
-    wheels.position.y = 0.31;
-    const torso = new Mesh(new BoxGeometry(0.5, 0.8, 0.42), dark);
-    torso.position.set(0, 1.4, -0.1);
-    const helmet = new Mesh(new BoxGeometry(0.32, 0.32, 0.34), paint);
-    helmet.position.set(0, 1.96, -0.06);
-    const cargoBox = new Mesh(new BoxGeometry(0.6, 0.55, 0.55), bag);
-    cargoBox.position.set(0, 1.32, -0.68);
-
-    for (const part of [frame, wheels, torso, helmet, cargoBox]) {
-      part.castShadow = true;
-      this.body.add(part);
-    }
+    this.body.add(this.model.object);
     this.body.rotation.order = 'YXZ';
     this.object.add(this.body);
   }

@@ -23,9 +23,17 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
 terrain following, airtime off ramps and crests, sliding along walls, and backing up: hold
 the brake at a standstill and after 0.35 s the rider paddles the bike backwards with their
-feet at 1.1 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
+feet at 1.6 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
 go. It also publishes `telemetry` (speed, throttle, brake, airtime, landings, scraping)
-each step for the sound and, later, the cargo model. The chase camera
+each step for the sound and, later, the cargo model.
+
+The bike and rider (`bike/bikeModel.ts`) are a small commuter motorcycle (spoked wheels
+that roll with the speed, a front end that turns about the raked steering head, tank,
+seat, engine with fins, exhaust, twin shocks, mirrors, number plate, delivery box on the
+rack) and a rider in helmet, jacket, gloves and boots. Arms reach the grips by two-bone IK
+and follow the bars; legs sit on the pegs, drop to the ground below 1.8 m/s, and paddle
+while backing up. Rigid parts are merged per moving piece and the limbs are rewritten
+into one mesh each frame: six draw calls in all. The chase camera
 with its anti-clipping spring arm is in. Still to do: keep or refine the handling the owner
 likes, wheelies, crash and respawn, a proper bike model, and the `RideSample` cargo signals.
 
