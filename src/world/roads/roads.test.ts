@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { AVENUE_Z, CROSS_STREETS, HILL_STREETS_X, SPAWN, surfaceAt } from '../layout';
+import {
+  AVENUE_Z,
+  CROSS_STREETS,
+  HALF,
+  HILL_STREETS_X,
+  NORTH_EXITS_X,
+  SPAWN,
+  surfaceAt,
+} from '../layout';
+import { HILLSIDE } from '../terrain';
 import { BIKE_TURN_RADIUS, RoadGraph, isRideable, nearestOnGraph } from './graph';
 import type { RoadPoint } from './graph';
 import { buildRoadNetwork } from './network';
@@ -126,7 +135,7 @@ describe('validation checks', () => {
     expect(curveIssues(graph)).toHaveLength(1);
   });
 
-  it('reports roads crossing without a junction, but not a bridge', () => {
+  it('reports roads crossing without a junction, even at different heights', () => {
     const graph = new RoadGraph();
     graph.edge(graph.node(-20, 0, 0), graph.node(20, 0, 0), straight(-20, 0, 20, 0), {
       kind: 'lane',
@@ -149,7 +158,7 @@ describe('validation checks', () => {
       straight(0, -20, 0, 20).map((p) => ({ ...p, y: 6 })),
       { kind: 'lane', area: 'hillside' },
     );
-    expect(overlapIssues(bridged)).toHaveLength(0);
+    expect(overlapIssues(bridged)).toHaveLength(1);
   });
 });
 
@@ -160,13 +169,19 @@ describe('the city network', () => {
     expect(validateGraph(graph, SPAWN.x, SPAWN.z)).toEqual([]);
   });
 
+  const cityNodes = graph.nodes.filter((node) =>
+    graph.edgesAt(node.id).some((id) => graph.getEdge(id).area === 'city'),
+  );
+
   it('has a node at every intersection', () => {
-    // Avenue ends and junctions, then each hill street at each cross street.
-    expect(graph.nodes).toHaveLength(2 + HILL_STREETS_X.length * (1 + CROSS_STREETS.length));
+    // Avenue ends and junctions, each hill street at each cross street, and the exits.
+    expect(cityNodes).toHaveLength(
+      2 + HILL_STREETS_X.length * (1 + CROSS_STREETS.length) + NORTH_EXITS_X.length,
+    );
   });
 
   it('lies on the asphalt and cobblestones of the city ground', () => {
-    for (const edge of graph.edges) {
+    for (const edge of graph.edges.filter((e) => e.area === 'city')) {
       for (const point of edge.points) {
         expect(['asphalt', 'cobble']).toContain(surfaceAt(point.x, point.z));
       }
@@ -192,5 +207,59 @@ describe('the city network', () => {
     const route = findRoute(graph, -140, AVENUE_Z, -100, AVENUE_Z, 'ride');
     expect(route?.length).toBeCloseTo(40);
     expect(route?.edges).toHaveLength(1);
+  });
+});
+
+describe('the hillside network', () => {
+  const graph = buildRoadNetwork();
+  const hillside = graph.edges.filter((edge) => edge.area === 'hillside');
+
+  it('enters the hillside through both exits at the top of the city', () => {
+    for (const x of NORTH_EXITS_X) {
+      const entrance = graph.nodes.find(
+        (node) => Math.abs(node.x - x) < 0.01 && Math.abs(node.z - HALF) < 0.01,
+      );
+      expect(entrance).toBeDefined();
+      const areas = new Set(graph.edgesAt(entrance?.id ?? -1).map((id) => graph.getEdge(id).area));
+      expect(areas).toEqual(new Set(['city', 'hillside']));
+    }
+  });
+
+  it('stays inside the hillside area', () => {
+    for (const edge of hillside) {
+      for (const p of edge.points) {
+        expect(p.x).toBeGreaterThanOrEqual(HILLSIDE.x0);
+        expect(p.x).toBeLessThanOrEqual(HILLSIDE.x1);
+        expect(p.z).toBeGreaterThanOrEqual(HILLSIDE.z0);
+        expect(p.z).toBeLessThanOrEqual(HILLSIDE.z1);
+      }
+    }
+  });
+
+  it('climbs well up the hill', () => {
+    const top = Math.max(...hillside.flatMap((edge) => edge.points.map((p) => p.y)));
+    expect(top).toBeGreaterThan(90);
+  });
+
+  it('can be ridden from the seafront to the top and back down the other way', () => {
+    const square = graph.nodes.find((node) => node.pad > 0 && node.z > HALF);
+    if (!square) throw new Error('no top square');
+    const up = findRoute(graph, SPAWN.x, SPAWN.z, square.x, square.z, 'ride');
+    expect(up).not.toBeNull();
+    expect(up?.length).toBeGreaterThan(900);
+    // Riding from the east entrance uses the Subida.
+    const east = findRoute(graph, NORTH_EXITS_X[1] ?? 90, HALF - 5, square.x, square.z, 'ride');
+    expect(east?.edges.some((id) => graph.getEdge(id).name === 'Rua da Subida')).toBe(true);
+  });
+
+  it('passes every check for many seeds', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      expect(validateGraph(buildRoadNetwork(seed), SPAWN.x, SPAWN.z), `seed ${seed}`).toEqual([]);
+    }
+  });
+
+  it('is the same for the same seed', () => {
+    const again = buildRoadNetwork();
+    expect(again.edges.map((edge) => edge.points)).toEqual(graph.edges.map((edge) => edge.points));
   });
 });

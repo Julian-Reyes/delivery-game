@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HALF, SEA_LEVEL, surfaceHeightAt } from './layout';
+import { addCityStreets } from './roads/city';
 import { RoadGraph } from './roads/graph';
 import type { RoadPoint } from './roads/graph';
 import { buildRoadNetwork } from './roads/network';
@@ -13,8 +14,7 @@ import {
   createNaturalHeight,
 } from './terrain';
 
-const cityOnly = buildRoadNetwork();
-const terrain = buildTerrain(1, cityOnly);
+const terrain = buildTerrain(1, new RoadGraph());
 
 describe('world grid', () => {
   it('puts cell edges exactly on the city edges', () => {
@@ -91,7 +91,7 @@ describe('Terrain', () => {
   });
 
   it('carves a road into the hill: flat bed under it, natural ground away from it', () => {
-    const graph = buildRoadNetwork();
+    const graph = new RoadGraph();
     const natural = createNaturalHeight(1);
     // A level shelf cut across the hillside.
     const y = natural(0, 300);
@@ -114,7 +114,41 @@ describe('Terrain', () => {
   });
 
   it('ignores city roads, which have their own ground', () => {
+    const city = new RoadGraph();
+    addCityStreets(city);
     const empty = buildTerrain(1, new RoadGraph());
-    expect(Array.from(empty.heights)).toEqual(Array.from(terrain.heights));
+    expect(Array.from(buildTerrain(1, city).heights)).toEqual(Array.from(empty.heights));
+  });
+
+  it('meets every road outside the city: exactly under the middle, never through an edge', () => {
+    for (const seed of [1, 2, 3]) {
+      const roads = buildRoadNetwork(seed);
+      const carved = buildTerrain(seed, roads);
+      for (const edge of roads.edges) {
+        if (edge.area === 'city') continue;
+        for (let i = 1; i + 1 < edge.points.length; i++) {
+          const p = edge.points[i];
+          const a = edge.points[i - 1];
+          const b = edge.points[i + 1];
+          if (!p || !a || !b || Math.abs(p.z) <= HALF + TERRAIN_CELL) continue;
+          // Where roads meet, their slopes differ a little across the junction.
+          const nearJunction = roads.nodes.some(
+            (node) => Math.hypot(node.x - p.x, node.z - p.z) < edge.width + 6,
+          );
+          if (!nearJunction) {
+            expect(Math.abs(carved.heightAt(p.x, p.z) - (p.y - ROAD_SINK))).toBeLessThan(0.1);
+          }
+          const length = Math.hypot(b.x - a.x, b.z - a.z);
+          for (const side of [-1, 1]) {
+            const x = p.x + ((b.z - a.z) / length) * side * (edge.width / 2);
+            const z = p.z - ((b.x - a.x) / length) * side * (edge.width / 2);
+            const gap = carved.heightAt(x, z) - p.y;
+            // Above the edge would show through the road; below, the road's skirt covers it.
+            expect(gap).toBeLessThan(0.6);
+            expect(gap).toBeGreaterThan(-1.5);
+          }
+        }
+      }
+    }
   });
 });

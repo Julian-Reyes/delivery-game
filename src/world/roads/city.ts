@@ -6,6 +6,7 @@ import {
   CROSS_STREETS,
   HALF,
   HILL_STREETS_X,
+  NORTH_EXITS_X,
   ROAD_HALF,
   heightAt,
 } from '../layout';
@@ -66,6 +67,17 @@ export function addCityStreets(graph: RoadGraph): void {
       );
     }
   });
+
+  // The streets that carry on out of the top of the city, into the hillside.
+  const topZ = crossZs[crossZs.length - 1] ?? 0;
+  for (const x of NORTH_EXITS_X) {
+    graph.edge(
+      node(x, topZ),
+      node(x, HALF),
+      along(topZ, HALF, (z) => ({ x, z })),
+      { kind: 'street', area: 'city', width: ROAD_HALF * 2, name: 'Hillside exit' },
+    );
+  }
 
   // Cross streets join neighbouring hill streets on each terrace.
   CROSS_STREETS.forEach((street, row) => {

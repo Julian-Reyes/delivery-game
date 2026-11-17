@@ -94,9 +94,9 @@ export interface RoadEdge {
 export interface EdgeOptions {
   kind: RoadKind;
   area: AreaId;
-  surface?: RoadSurface;
-  width?: number;
-  name?: string;
+  surface?: RoadSurface | undefined;
+  width?: number | undefined;
+  name?: string | undefined;
 }
 
 export interface NodeOptions {

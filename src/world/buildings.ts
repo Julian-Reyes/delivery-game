@@ -4,6 +4,7 @@ import {
   CURB,
   HALF,
   HILL_STREETS_X,
+  NORTH_EXITS_X,
   NORTH_ROW_Z,
   SEAFRONT_Z_MAX,
   CORRIDOR_HALF,
@@ -182,9 +183,30 @@ export function planBuildings(): BuildingSpec[] {
   frontage(out, random, -HALF, SEAFRONT_Z_MAX, 1, 0, westX + HALF, south, ROW_DEPTH, ROW_DEPTH);
   frontage(out, random, eastX, SEAFRONT_Z_MAX, 1, 0, HALF - eastX, south, ROW_DEPTH, ROW_DEPTH);
 
-  // The row along the top of the hill, backed by the mountain.
+  // The row along the top of the hill, broken where streets carry on up into the hillside.
   const topDepth = HALF - NORTH_ROW_Z;
-  frontage(out, random, westX, NORTH_ROW_Z, 1, 0, eastX - westX, south, topDepth, topDepth);
+  let rowStart = westX;
+  for (const exit of [...NORTH_EXITS_X].sort((a, b) => a - b)) {
+    const gapStart = exit - CORRIDOR_HALF;
+    if (gapStart > rowStart + 0.01) {
+      frontage(
+        out,
+        random,
+        rowStart,
+        NORTH_ROW_Z,
+        1,
+        0,
+        gapStart - rowStart,
+        south,
+        topDepth,
+        topDepth,
+      );
+    }
+    rowStart = exit + CORRIDOR_HALF;
+  }
+  if (eastX > rowStart + 0.01) {
+    frontage(out, random, rowStart, NORTH_ROW_Z, 1, 0, eastX - rowStart, south, topDepth, topDepth);
+  }
 
   return out;
 }

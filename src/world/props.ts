@@ -15,6 +15,7 @@ import {
   heightAt,
   surfaceHeightAt,
 } from './layout';
+import { WORLD } from './terrain';
 
 /** Street furniture, vegetation, parked cars, the beach and the offshore islands. */
 
@@ -596,9 +597,17 @@ export function addBackdrop(city: GeoBuilder, solids: SolidBox[], random: Random
     } else {
       city.quad([face, 0, z0], [face, 0, z1], [face, 6.2, z1], [face, 6.2, z0], 0x0d0d10);
     }
-    solids.push({ x: side * (HALF + 0.5), y: 10, z: 0, hx: 0.5, hy: 40, hz: HALF + 10, yaw: 0 });
+    // Stop at the top edge of the city: beyond it the hillside is open.
+    solids.push({ x: side * (HALF + 0.5), y: 10, z: -5, hx: 0.5, hy: 40, hz: HALF + 5, yaw: 0 });
   }
-  // Keep riders out of the sea and off the back of the map.
+  // Keep riders out of the sea, and inside the land edges of the world, where the terrain
+  // rises steeply enough to hide the walls.
   solids.push({ x: 0, y: 10, z: -137, hx: HALF + 10, hy: 40, hz: 0.5, yaw: 0 });
-  solids.push({ x: 0, y: 40, z: HALF + 0.5, hx: HALF + 10, hy: 60, hz: 0.5, yaw: 0 });
+  const midX = (WORLD.x0 + WORLD.x1) / 2;
+  const midZ = (WORLD.z0 + WORLD.z1) / 2;
+  const spanX = (WORLD.x1 - WORLD.x0) / 2;
+  const spanZ = (WORLD.z1 - WORLD.z0) / 2;
+  solids.push({ x: midX, y: 150, z: WORLD.z1 - 6, hx: spanX, hy: 250, hz: 0.5, yaw: 0 });
+  solids.push({ x: WORLD.x0 + 6, y: 150, z: midZ, hx: 0.5, hy: 250, hz: spanZ, yaw: 0 });
+  solids.push({ x: WORLD.x1 - 6, y: 150, z: midZ, hx: 0.5, hy: 250, hz: spanZ, yaw: 0 });
 }

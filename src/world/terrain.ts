@@ -37,8 +37,12 @@ export const HEADLAND = { x0: -620, x1: -200, z0: -230, z1: 160 } as const;
 const CITY_BLEND = 40;
 /** Road surfaces sit this far above the carved ground, so the ground never shows through. */
 export const ROAD_SINK = 0.15;
-/** Flat strip either side of a road before the cut or fill slope starts. */
-const SHOULDER = 1.5;
+/**
+ * Flat strip either side of a road before the cut or fill slope starts. One cell diagonal
+ * wide, so every terrain triangle under any part of a road is entirely flat bed and none
+ * of the bank can poke up through the road's edge.
+ */
+const SHOULDER = TERRAIN_CELL * Math.SQRT2;
 /** Cut and fill slopes: rise per metre of distance from the road. */
 const BANK_SLOPE = 1.1;
 const BANK_REACH = 45;
@@ -119,8 +123,8 @@ export function createNaturalHeight(seed: number): (x: number, z: number) => num
     // A stream ravine winding down the hillside leaves spurs either side of it.
     const ravineX = 40 + 25 * Math.sin(z / 70);
     const ravine =
-      14 *
-      Math.exp(-(((x - ravineX) / 22) ** 2)) *
+      12 *
+      Math.exp(-(((x - ravineX) / 30) ** 2)) *
       smoothstep((z - 190) / 80) *
       (1 - smoothstep((z - 480) / 60));
     let height = (cityTop + climb - ravine) * hillsideMask;
@@ -144,7 +148,7 @@ export function createNaturalHeight(seed: number): (x: number, z: number) => num
     // Rough the hills up, more the higher they are, so the beach stays smooth.
     const hilliness = smoothstep(height / 25);
     height +=
-      hilliness * (8 * noise(x / 95, z / 95) + 3 * noise(x / 37, z / 37)) +
+      hilliness * (5 * noise(x / 110, z / 110) + 2 * noise(x / 41, z / 41)) +
       hilliness * 1.2 * detail(x / 11, z / 11);
     height = Math.max(height, 3 + 1.5 * noise(x / 60, z / 60));
 
@@ -261,6 +265,8 @@ export function buildTerrain(seed: number, roads: RoadGraph): Terrain {
         for (let ix = ix0; ix <= ix1; ix++) {
           const x = WORLD.x0 + ix * TERRAIN_CELL;
           const z = WORLD.z0 + iz * TERRAIN_CELL;
+          // The city's edge belongs to the city ground; moving it would open a crack.
+          if (Math.abs(x) <= HALF && Math.abs(z) <= HALF) continue;
           const { distance, t } = distanceToSegment(x, z, a.x, a.z, b.x, b.z);
           if (distance > reach) continue;
           const y = a.y + (b.y - a.y) * t - ROAD_SINK;
@@ -268,11 +274,7 @@ export function buildTerrain(seed: number, roads: RoadGraph): Terrain {
           const bank = Math.max(0, distance - core) * BANK_SLOPE;
           low[index] = Math.max(low[index] ?? -Infinity, y - bank);
           high[index] = Math.min(high[index] ?? Infinity, y + bank);
-          // A cell corner within half a diagonal of the road is part of its bed.
-          if (
-            distance <= core + TERRAIN_CELL * 0.71 &&
-            distance < (underDistance[index] ?? Infinity)
-          ) {
+          if (distance <= core && distance < (underDistance[index] ?? Infinity)) {
             underDistance[index] = distance;
             under[index] = y;
           }

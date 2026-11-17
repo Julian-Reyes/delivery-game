@@ -5,7 +5,7 @@ import { canTurn, canTurnAround, nextStates, reverseState, stateOf } from './tur
 /**
  * Checks that the road graph is something you can actually ride: every road reachable from
  * the spawn and back, no grade or curve beyond what its kind allows, no roads running
- * through each other, and somewhere to turn round at every dead end.
+ * through or over each other, and somewhere to turn round at every dead end.
  */
 
 export type IssueKind =
@@ -30,8 +30,6 @@ export interface RoadIssue {
 
 /** Longest centreline segment the curve check can trust. */
 export const MAX_SEGMENT = 4;
-/** Roads further apart than this vertically are a bridge over the other, not a clash. */
-const BRIDGE_CLEARANCE = 4;
 const HASH_CELL = 20;
 
 function circumradius(a: RoadPoint, b: RoadPoint, c: RoadPoint): number {
@@ -272,7 +270,8 @@ export function overlapIssues(graph: RoadGraph): RoadIssue[] {
         if (reported.has(pair)) continue;
         const hit = segmentDistance(s.a, s.b, t.a, t.b);
         if (hit.distance >= (s.edge.width + t.edge.width) / 2 - 1e-6) continue;
-        if (hit.dy > BRIDGE_CLEARANCE) continue;
+        // No bridges yet: nothing builds a deck or supports, and the terrain can only be
+        // carved for one of the two roads, so roads crossing at any height clash.
 
         let exempt = false;
         for (const node of [s.edge.from, s.edge.to]) {

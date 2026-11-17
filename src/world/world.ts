@@ -34,6 +34,8 @@ import {
   addVegetation,
 } from './props';
 import type { SolidBox } from './props';
+import { buildRoadGeometry } from './roadMesh';
+import type { RoadGraph } from './roads/graph';
 import type { Terrain } from './terrain';
 import { buildTerrainGeometry } from './terrainMesh';
 import { createGroundTextures, createSignAtlas } from './textures';
@@ -138,7 +140,13 @@ export class World {
   private readonly sky = createSky();
   private readonly fog = new Fog(SKY_HORIZON, 70, 520);
 
-  constructor(physics: Physics, anisotropy: number, terrain: Terrain, seed: number) {
+  constructor(
+    physics: Physics,
+    anisotropy: number,
+    terrain: Terrain,
+    roads: RoadGraph,
+    seed: number,
+  ) {
     const random = createRandom(2024);
     const { scene } = this;
 
@@ -203,6 +211,12 @@ export class World {
     }
 
     const paint = new MeshLambertMaterial({ vertexColors: true });
+
+    // Roads outside the city, straight from the road graph.
+    const roadGeometry = buildRoadGeometry(roads);
+    const roadMesh = new Mesh(roadGeometry.surfaces.build(), paint);
+    roadMesh.receiveShadow = true;
+    scene.add(roadMesh);
     scene.add(new Mesh(city.build(), paint));
 
     const extrasMesh = new Mesh(extras.build(), paint);
@@ -240,6 +254,7 @@ export class World {
     // Physics.
     physics.addGroundMesh(ground.colliderPositions, ground.colliderIndices);
     physics.addGroundMesh(terrainGeometry.colliderPositions, terrainGeometry.colliderIndices);
+    physics.addGroundMesh(roadGeometry.colliderPositions, roadGeometry.colliderIndices);
     physics.addGroundMesh(new Float32Array(extras.positions), new Uint32Array(extras.indices));
     for (const b of buildings) {
       const centerY = (b.floorY + b.height + b.baseY) / 2;

@@ -114,7 +114,7 @@ are not.
 - **Edges:** steep wooded slopes with walls hidden in them, backdrop hills further out, fog.
 
 Order of work: road graph and debug map (done), terrain system and extended world (done), Area 1
-main roads, Area 1 small streets, Area 1 buildings and delivery spots, then Area 2.
+main roads (done), Area 1 small streets, Area 1 buildings and delivery spots, then Area 2.
 
 ### Terrain
 
@@ -133,8 +133,30 @@ and normals from the height grid, so chunks shade seamlessly. Cells inside the c
 the sea are skipped. The collider is one triangle mesh. Draw calls went from 24 to about 36,
 about 120k triangles in view.
 
-The city is still sealed (its buildings and boundary walls) until the hillside roads open
-it.
+### Area 1 main roads
+
+The x = −30 and x = 90 hill streets carry on through gaps in the top row of buildings
+(`NORTH_EXITS_X` in `layout.ts`, climbing at 10% instead of the steep bank behind the
+city) to entrance nodes on the city's edge. From there (`roads/hillside.ts`):
+
+- **Estrada do Morro** (main, 7 m) zigzags up from the west entrance in four legs and
+  hairpins to a square with a turning pad about 70 m above the city. The legs run across
+  the slope, which rises about 28% northward. Which side each hairpin is on is fixed;
+  how far up the hill it sits is solved against the ground so each leg climbs at about
+  7%, and the ground is averaged across the hairpin that follows so the road arrives a
+  little above the ground and leaves a little below it. Road cuts are typically under
+  7 m, up to about 12 m at a hairpin.
+- **Rua da Subida** (main) climbs diagonally from the east entrance and meets the
+  Estrada's second leg square on, west of the ravine, where the two are at the same
+  height. Up one, down the other makes a loop through the city.
+
+`roads/design.ts` holds the tools: `filletPath` (straights joined by arcs, hairpins as two
+corners), `fitProfile` (follows the smoothed ground within a grade limit, smoothing the
+knees so crests don't throw the bike), and `RoadPlan` (junctions, turning pads, splitting
+designed roads into graph edges). Roads outside the city are drawn from the graph by
+`roadMesh.ts`: a strip per edge, skirts down each side to hide fills, and pad discs; one
+draw call, and the same triangles are the ride collider. The top-of-city boundary wall is
+gone; three walls hidden in the steep ground at the world's land edges replace it.
 
 ### Road graph
 
@@ -159,14 +181,21 @@ The city's grid streets keep their steep straight climbs (up to 35%). Everything
 The bike can't reverse and turns no tighter than about 3.7 m radius, so the validator
 (`validate.ts`) checks turns as the bike would ride them: a corner is passable if the line
 from outside edge to inside corner and back has enough radius. It reports grades and curves
-beyond each kind's limit, roads running into each other except at junctions (bridges more
-than 4 m apart vertically are fine), dead ends without a turning pad, edges the bike can't
+beyond each kind's limit, roads running into or over each other except at junctions (no
+bridges yet: nothing builds a deck, and the terrain can only be carved for one road),
+dead ends without a turning pad, edges the bike can't
 reach from the spawn, and edges it can enter but never leave. `route.ts` finds the shortest
 riding or walking route, for delivery distances and the waypoint later.
 
 **M** shows the debug map: relief and 5 m contours, roads coloured by area, pedestrian routes
 dashed, rings where areas meet, red crosses on validation problems, and the rider. Scroll to
 zoom, drag to pan, click to drop the rider on the nearest road there.
+
+**Autopilot** (dev builds): `await __game.autopilot.ride(x, z)` rides the bike along the
+graph's route to the road nearest (x, z) using ordinary inputs, and reports whether it
+arrived, the furthest it strayed from the centreline, the longest time in the air, and
+where it got stuck. Seed 1: up the Estrada, 931 m in 47 s, 1.2 m off at most; down the
+Subida, 2.1 m off and one 0.35 s hop; up the Subida, 2 m off.
 
 **C** (dev builds) switches to a free camera: W/S fly, A/D turn, Q/E height. It tilts
 towards top-down the higher it goes and turns the fog off.

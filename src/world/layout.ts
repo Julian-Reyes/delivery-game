@@ -57,6 +57,14 @@ const HILL_ROAD_Z_MAX = 140;
 const HILL_CORRIDOR_Z_MAX = 142.5;
 export const NORTH_ROW_Z = HILL_CORRIDOR_Z_MAX;
 
+/**
+ * Hill streets that carry on north through the top row of buildings and out of the city
+ * into the hillside. Beyond the top cross street they climb gently instead of following
+ * the steep bank behind the city.
+ */
+export const NORTH_EXITS_X: readonly number[] = [-30, 90];
+const EXIT_GRADE = 0.1;
+
 /** The east side of the hill is this much higher (and the west lower) than the middle. */
 const EAST_GAIN = 0.3;
 const SAND_SLOPE = 0.03;
@@ -113,11 +121,18 @@ function profile(z: number): number {
   return last.height;
 }
 
+function terrainGain(x: number): number {
+  return 1 + EAST_GAIN * clamp(x / HALF, -1, 1);
+}
+
 /** Height of the road-level ground at any point. Sidewalks and lots add CURB on top. */
 export function heightAt(x: number, z: number): number {
+  if (z > NORTH_ROW_Z && nearAny(x, NORTH_EXITS_X, CORRIDOR_HALF)) {
+    return profile(NORTH_ROW_Z) * terrainGain(x) + (z - NORTH_ROW_Z) * EXIT_GRADE;
+  }
   const base = profile(z);
   if (base <= 0) return base;
-  return base * (1 + EAST_GAIN * clamp(x / HALF, -1, 1));
+  return base * terrainGain(x);
 }
 
 function nearAny(value: number, centres: readonly number[], distance: number): boolean {
@@ -131,9 +146,13 @@ export function surfaceAt(x: number, z: number): Surface {
   if (z < AVENUE_Z_MIN) return 'mosaic';
   if (z < AVENUE_Z_MAX) return 'asphalt';
 
-  let onRoad = z < HILL_ROAD_Z_MAX && nearAny(x, HILL_STREETS_X, ROAD_HALF);
+  let onRoad =
+    (z < HILL_ROAD_Z_MAX && nearAny(x, HILL_STREETS_X, ROAD_HALF)) ||
+    nearAny(x, NORTH_EXITS_X, ROAD_HALF);
   let onCorridor =
-    z < SEAFRONT_Z_MAX || (z < HILL_CORRIDOR_Z_MAX && nearAny(x, HILL_STREETS_X, CORRIDOR_HALF));
+    z < SEAFRONT_Z_MAX ||
+    (z < HILL_CORRIDOR_Z_MAX && nearAny(x, HILL_STREETS_X, CORRIDOR_HALF)) ||
+    nearAny(x, NORTH_EXITS_X, CORRIDOR_HALF);
 
   for (const street of CROSS_STREETS) {
     const dz = Math.abs(z - street.z);

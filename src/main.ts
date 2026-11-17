@@ -4,6 +4,7 @@ import { BRAND } from './brand';
 import { DebugOverlay } from './core/debugOverlay';
 import { createLoop } from './core/loop';
 import { FreeCamera } from './core/freeCamera';
+import { Autopilot } from './dev/autopilot';
 import { createRenderer } from './core/renderer';
 import { GamepadSource } from './input/gamepad';
 import { InputManager } from './input/inputManager';
@@ -70,7 +71,7 @@ async function boot(): Promise<void> {
 
   const physics = await Physics.create();
   const anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  const world = new World(physics, anisotropy, terrain, seed);
+  const world = new World(physics, anisotropy, terrain, roads, seed);
   const rider = new Rider(physics, SPAWN);
   world.scene.add(rider.object);
   const chase = new ChaseCamera(physics);
@@ -121,8 +122,16 @@ async function boot(): Promise<void> {
   titleCard.addEventListener('pointerdown', startRiding);
 
   if (import.meta.env.DEV) {
+    // Rides routes on its own: `await __game.autopilot.ride(x, z)` returns a report.
+    const autopilot = new Autopilot(
+      roads,
+      rider.pose,
+      () => rider.speedKmh / 3.6,
+      () => rider.airborne,
+    );
+    input.addSource(autopilot);
     // Console handle for poking at the game while developing, e.g. __game.rider.teleport().
-    Object.assign(window, { __game: { rider, chase, free, world, roads, terrain } });
+    Object.assign(window, { __game: { rider, chase, free, world, roads, terrain, autopilot } });
   }
 
   let frameDt = 0;

@@ -66,6 +66,10 @@ export class Rider {
     return this.speed * 3.6;
   }
 
+  get airborne(): boolean {
+    return !this.grounded;
+  }
+
   respawn(): void {
     this.teleport(this.spawn.x, this.spawn.z, this.spawn.heading);
   }
