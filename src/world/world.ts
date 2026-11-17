@@ -34,6 +34,8 @@ import {
   addVegetation,
 } from './props';
 import type { SolidBox } from './props';
+import { createFacadeAtlas } from './facades';
+import { addFavelaProps } from './favelaProps';
 import { addHouses } from './houseMesh';
 import type { HousePlan } from './houses';
 import { buildRoadGeometry } from './roadMesh';
@@ -190,7 +192,9 @@ export class World {
     addBarTables(city, random);
     addBeach(city, solids, random);
     addBackdrop(city, solids, random);
-    addHouses(city, solids, favela.houses, favela.spots);
+    const facades = new GeoBuilder(true);
+    addHouses(facades, city, wires, solids, favela.houses, favela.spots);
+    const favelaProps = addFavelaProps(city, wires, solids, roads, favela.houses, 'hillside', seed);
 
     // Ground: one mesh per surface texture.
     const textures = createGroundTextures(anisotropy);
@@ -215,6 +219,14 @@ export class World {
     }
 
     const paint = new MeshLambertMaterial({ vertexColors: true });
+
+    // Favela walls: every house in one textured mesh, plus the parked motorbikes.
+    const facadeMesh = new Mesh(
+      facades.build(),
+      new MeshLambertMaterial({ map: createFacadeAtlas(anisotropy), vertexColors: true }),
+    );
+    facadeMesh.receiveShadow = true;
+    scene.add(facadeMesh, favelaProps.bikes);
 
     // Roads outside the city, straight from the road graph.
     const roadGeometry = buildRoadGeometry(roads);

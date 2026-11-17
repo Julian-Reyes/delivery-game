@@ -20,6 +20,9 @@ const SURFACE_COLORS: Record<RoadKind, number> = {
 };
 const SKIRT = 0x8d877c;
 const SKIRT_DEPTH = 6;
+/** Concrete paving from the road edge to the house fronts. */
+const APRON = 1.4;
+const APRON_COLOR = 0x9a958b;
 const PAD_SEGMENTS = 20;
 
 export interface RoadGeometry {
@@ -57,6 +60,10 @@ export function buildRoadGeometry(graph: RoadGraph): RoadGeometry {
     // Cross-section at each point, perpendicular to the averaged direction there.
     const left: [number, number, number][] = [];
     const right: [number, number, number][] = [];
+    // The concrete apron beyond each edge, out to the house fronts.
+    const apron = edge.kind === 'stairs' ? 0 : APRON;
+    const leftOut: [number, number, number][] = [];
+    const rightOut: [number, number, number][] = [];
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
       const before = points[Math.max(0, i - 1)];
@@ -69,6 +76,9 @@ export function buildRoadGeometry(graph: RoadGraph): RoadGeometry {
       const oz = (-dx / length) * half;
       left.push([p.x + ox, p.y + raise, p.z + oz]);
       right.push([p.x - ox, p.y + raise, p.z - oz]);
+      const wide = (half + apron) / half;
+      leftOut.push([p.x + ox * wide, p.y + raise - 0.03, p.z + oz * wide]);
+      rightOut.push([p.x - ox * wide, p.y + raise - 0.03, p.z - oz * wide]);
     }
 
     for (let i = 1; i < left.length; i++) {
@@ -80,13 +90,23 @@ export function buildRoadGeometry(graph: RoadGraph): RoadGeometry {
       const l1 = left[i];
       const r0 = right[i - 1];
       const r1 = right[i];
-      if (!l0 || !l1 || !r0 || !r1) continue;
+      const lo0 = leftOut[i - 1];
+      const lo1 = leftOut[i];
+      const ro0 = rightOut[i - 1];
+      const ro1 = rightOut[i];
+      if (!l0 || !l1 || !r0 || !r1 || !lo0 || !lo1 || !ro0 || !ro1) continue;
       const shade = 0.96 + 0.08 * (((i * 7919) % 13) / 13);
       surfaces.quad(r0, r1, l1, l0, color, [shade, shade, shade, shade]);
       collide([r0, r1, l1, l0]);
+      if (apron > 0) {
+        surfaces.quad(l0, l1, lo1, lo0, APRON_COLOR, [shade, shade, shade, shade]);
+        surfaces.quad(ro0, ro1, r1, r0, APRON_COLOR, [shade, shade, shade, shade]);
+        collide([l0, l1, lo1, lo0]);
+        collide([ro0, ro1, r1, r0]);
+      }
       for (const [top0, top1] of [
-        [l0, l1],
-        [r0, r1],
+        [lo0, lo1],
+        [ro0, ro1],
       ] as const) {
         surfaces.quadDouble(
           top0,

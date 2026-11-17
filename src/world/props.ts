@@ -130,7 +130,8 @@ export function addRamps(extras: GeoBuilder): void {
 
 // --- Power lines ------------------------------------------------------------------------
 
-function wire(wires: number[], a: Vec3, b: Vec3, sag: number, segments = 6): void {
+/** A sagging cable from `a` to `b`, as line segments appended to `wires`. */
+export function wire(wires: number[], a: Vec3, b: Vec3, sag: number, segments = 6): void {
   for (let i = 0; i < segments; i++) {
     for (const t of [i / segments, (i + 1) / segments]) {
       wires.push(
@@ -393,15 +394,16 @@ export function addBunting(city: GeoBuilder, wires: number[]): void {
   }
 }
 
-function addCar(
+/** A parked car or van with its collider. `y` defaults to the city ground there. */
+export function addCar(
   city: GeoBuilder,
   solids: SolidBox[],
   x: number,
   z: number,
   yaw: number,
   random: Random,
+  y = heightAt(x, z),
 ): void {
-  const y = heightAt(x, z);
   city.setFrame(x, y, z, yaw);
   const wheels = (reach: number): void => {
     for (const wx of [-0.8, 0.8]) {

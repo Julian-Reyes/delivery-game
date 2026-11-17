@@ -17,7 +17,7 @@ const CHUNK = 48;
 const GRASS = new Color(0x6f9a4f);
 const FOREST = new Color(0x3d6a37);
 const ROCK = new Color(0x8a8378);
-const EARTH = new Color(0x9c7f5a);
+const EARTH = new Color(0x8f7a62);
 const SAND = new Color(0xd6c497);
 
 export interface TerrainGeometry {
@@ -64,7 +64,7 @@ export function buildTerrainGeometry(terrain: Terrain, seed: number): TerrainGeo
     out.copy(GRASS).lerp(FOREST, smoothstep((n + 0.1) * 2.5));
     // Bare trodden earth where people live, granite where it is too steep for soil.
     if (inside(HILLSIDE, x, z) || inside(HEADLAND, x, z)) {
-      out.lerp(EARTH, 0.35 + 0.3 * smoothstep(patches(x / 17, z / 17) + 0.3));
+      out.lerp(EARTH, 0.65 + 0.3 * smoothstep(patches(x / 17, z / 17) + 0.3));
     }
     out.lerp(ROCK, smoothstep((slope - 0.9) * 2));
     out.lerp(SAND, 1 - smoothstep(h / 2.5));

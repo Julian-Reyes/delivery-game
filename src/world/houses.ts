@@ -21,6 +21,9 @@ import type { Terrain } from './terrain';
 
 export const FLOOR_HEIGHT = 2.8;
 
+/** What the walls are: bare brick, bare concrete block, or plastered and painted. */
+export type Finish = 'brick' | 'block' | 'plaster';
+
 export interface House {
   readonly id: number;
   readonly area: AreaId;
@@ -38,6 +41,8 @@ export interface House {
   /** Ground floor level, at the front door. */
   readonly floorY: number;
   readonly floors: number;
+  readonly finish: Finish;
+  /** Paint or tint over the finish; white for bare brick. */
   readonly color: number;
   /** The road edge it fronts, or null for houses filling in behind. */
   readonly street: number | null;
@@ -92,9 +97,12 @@ const DOOR_TO_PATH = 20;
 /** A drop-off up a stair or footpath may be this far on foot from the bike. */
 export const MAX_WALK = 90;
 
-const BRICK = [0xb5643c, 0xa8573a, 0xc0714a, 0x9f5235] as const;
-const CONCRETE = [0x9e9a92, 0xb3afa6, 0x8c8880] as const;
-const PAINT = [0xe8d9b5, 0x8fc1d9, 0xe7b4a0, 0xf2e3a0, 0xcfe0c3, 0xf4f1ea, 0xd9a3c6] as const;
+/** Brick keeps its own colour; this only varies how fired it looks. */
+const BRICK = [0xffffff, 0xf2e6dc, 0xffeee4, 0xe6d6c8] as const;
+const CONCRETE = [0xb9b5ad, 0xc9c5bc, 0xa9a59d] as const;
+const PAINT = [
+  0xf0dca8, 0x8fc1d9, 0xf0a98e, 0xf6e27a, 0xbfe0b0, 0xf7f4ec, 0xe2a3cf, 0x7fd0c0, 0xffb35c,
+] as const;
 
 interface Rect {
   x: number;
@@ -330,8 +338,13 @@ export function planHouses(options: HouseOptions): HousePlan {
     if (floors > MAX_FLOORS) return null;
 
     const roll = random();
+    const finish: Finish = roll < 0.45 ? 'brick' : roll < 0.65 ? 'block' : 'plaster';
     const color =
-      roll < 0.45 ? pick(random, BRICK) : roll < 0.7 ? pick(random, CONCRETE) : pick(random, PAINT);
+      finish === 'brick'
+        ? pick(random, BRICK)
+        : finish === 'block'
+          ? pick(random, CONCRETE)
+          : pick(random, PAINT);
     const house: House = {
       id: houses.length,
       area: area.area,
@@ -343,6 +356,7 @@ export function planHouses(options: HouseOptions): HousePlan {
       baseY: lowest - 0.4,
       floorY,
       floors,
+      finish,
       color,
       street: street?.id ?? null,
     };

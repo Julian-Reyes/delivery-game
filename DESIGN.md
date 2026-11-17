@@ -208,9 +208,23 @@ turning pad, not over a neighbour (walls may touch), and on buildable ground:
   lowest point under the footprint (up to 8 m on the downhill side); a house with the
   hill rising behind it gains storeys (up to 5) until its roof clears the slope.
 
-Placeholder look: one coloured block (brick, bare concrete or paint) on a grey foundation
-with a flat roof slab, merged into the city mesh, and a box collider each. About 1,000
-houses on seed 1; the full view is about 32 draw calls and 160k triangles.
+**Look** (`houseMesh.ts`, `facades.ts`, `favelaProps.ts`): every house has a finish (bare
+brick, bare concrete block, or painted plaster in a strong colour) and its walls are split
+into bays and floors, each mapped to a tile of a canvas-painted facade atlas: barred and
+shuttered windows, small windows, doors, roller shutters, all with grime streaks. Plaster
+and block tiles are pale so the house colour tints them. All walls are one textured draw
+call. Roofs get an overhanging slab and, at random, a parapet or a part-built next floor,
+rebar sticking up (as lines), and a blue water tank. Pickup shops get roller shutters and
+an awning. A bare block foundation shows where the slope drops away.
+
+Streets get a 1.4 m concrete apron out to the house fronts; poles every ~26 m with sagging
+cables between them and drops to nearby houses; cars parked along main and secondary
+roads (with colliders, never at junctions or in bends); and about 130 parked motorbikes,
+many with a delivery box, as one instanced mesh. The favela ground is bare earth.
+
+With the favela in view: about 27 draw calls, 260k triangles and 1 ms of CPU per frame on
+a desktop. Triangles are the cost to watch on phones; the walls could be split by chunk
+for culling if needed.
 
 Delivery spots (`DeliverySpot`): four pickups at shops on the main roads, spread 90 m
 apart, and sixteen drop-offs, half at doors on rideable streets and half where you park on
