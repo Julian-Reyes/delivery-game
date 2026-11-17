@@ -188,11 +188,12 @@ body,
   position: absolute;
   left: max(0.9rem, env(safe-area-inset-left));
   bottom: max(0.9rem, env(safe-area-inset-bottom));
-  width: clamp(130px, 22vmin, 200px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 3px solid rgb(255 255 255 / 85%);
-  box-shadow: 0 4px 18px rgb(0 0 0 / 45%);
+  width: clamp(180px, 30vmin, 290px);
+  aspect-ratio: 1.55;
+  border-radius: 10px;
+  border: 3px solid #0c0d0f;
+  outline: 1px solid rgb(255 255 255 / 35%);
+  box-shadow: 0 6px 22px rgb(0 0 0 / 55%);
   overflow: hidden;
   pointer-events: none;
   z-index: 5;
@@ -208,18 +209,17 @@ body,
   height: 100%;
 }
 
-/* The bike, always in the middle and pointing the way you face. */
+/* The bike: a white arrow below the middle, pointing the way you face. */
 .minimap-arrow {
   position: absolute;
   left: 50%;
-  top: 50%;
   width: 0;
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 16px solid #ff5a3c;
+  border-bottom: 17px solid #ffffff;
   transform: translate(-50%, -60%);
-  filter: drop-shadow(0 0 2px rgb(0 0 0 / 90%));
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 95%));
 }
 
 .minimap-north {
@@ -229,10 +229,11 @@ body,
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgb(20 22 26 / 85%);
+  background: #0c0d0f;
+  border: 1px solid rgb(255 255 255 / 70%);
   color: #fff;
   font:
-    700 11px/18px system-ui,
+    700 10px/16px system-ui,
     sans-serif;
   text-align: center;
 }

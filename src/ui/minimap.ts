@@ -1,16 +1,21 @@
 import type { BuildingSpec } from '../world/buildings';
 import type { DeliverySpot, House } from '../world/houses';
-import { SEA_LEVEL } from '../world/layout';
+import { AVENUE_Z, AVENUE_Z_MAX, AVENUE_Z_MIN, HALF, SEA_LEVEL, surfaceAt } from '../world/layout';
+import type { Surface } from '../world/layout';
 import type { RoadGraph, RoadKind } from '../world/roads/graph';
 
 /**
- * The minimap in the bottom-left corner: a round window on the roads and buildings around
- * the bike, turned so the way you are facing is always up, zooming out as you speed up.
- * Pickups and drop-offs show as icons; an N on the rim points north.
+ * The minimap, bottom left, in the style of the radar in open-world crime games: a dark,
+ * muted map with bright roads, turned so straight ahead is always up, the bike a little
+ * below the middle so more of the road ahead shows, zooming out with speed.
  *
- * The map is painted once into an offscreen canvas; each frame only draws a rotated crop
- * of it, so it costs next to nothing.
+ * Inside the city the ground is painted from the layout itself, so every street has its
+ * real width (the four-lane seafront avenue is half again as wide as the side streets,
+ * with its yellow centre line), the beach is sand, the promenade shows its black and white
+ * waves, and the park is green. Outside, the hills get relief shading and the favela
+ * roads are drawn from the road graph.
  *
+ * Everything is painted once into an offscreen canvas; each frame draws a rotated crop.
  * Like the 3D view, +x is on your left when facing +z (north).
  */
 
@@ -33,30 +38,72 @@ export interface MinimapData {
 const TEXT = { north: 'N' };
 
 /** Offscreen map resolution, pixels per metre. */
-const PIXELS_PER_METRE = 1.6;
-/** World radius shown at a standstill and at top speed, metres. */
-const NEAR_RADIUS = 70;
-const FAR_RADIUS = 140;
+const PIXELS_PER_METRE = 2;
+/** Metres from the bike to the top edge of the map, standing still and at top speed. */
+const NEAR_RANGE = 75;
+const FAR_RANGE = 150;
 const TOP_SPEED = 28;
-const GROUND_SAMPLE = 4;
+/** The bike sits this far down the map, so more of what is ahead shows. */
+const BIKE_DOWN = 0.64;
+const TERRAIN_SAMPLE = 2;
 
-const WATER = '#2c6f86';
-const LAND_LOW = [86, 98, 78] as const;
-const LAND_HIGH = [118, 112, 92] as const;
-const BUILDING = '#c9b79c';
-const HOUSE = '#b59a7c';
-const CASING = 'rgba(20,22,26,0.85)';
+type Rgb = readonly [number, number, number];
+
+const PALETTE = {
+  deepWater: [34, 74, 112] as Rgb,
+  water: [52, 102, 146] as Rgb,
+  sand: [218, 198, 146] as Rgb,
+  land: [64, 74, 60] as Rgb,
+  highland: [86, 84, 70] as Rgb,
+  park: [80, 120, 62] as Rgb,
+  lot: [58, 61, 66] as Rgb,
+  sidewalk: [84, 87, 92] as Rgb,
+  road: [160, 163, 168] as Rgb,
+  /** The seafront avenue stands out, like a highway on a road map. */
+  avenue: [238, 236, 226] as Rgb,
+  cobble: [168, 156, 136] as Rgb,
+  mosaicDark: [36, 36, 38] as Rgb,
+  mosaicLight: [236, 234, 228] as Rgb,
+};
+const CITY_BUILDING = '#6c7077';
+const HOUSE = '#6e6660';
+const APRON = '#5f6268';
+const LINE_YELLOW = '#f0c419';
 const ROAD_COLORS: Record<RoadKind, string> = {
-  avenue: '#f4e9c8',
-  street: '#e9e6de',
-  main: '#ffd66b',
-  secondary: '#f1eee6',
-  lane: '#dcd8cf',
-  alley: '#cfcac0',
-  stairs: '#f1eee6',
+  avenue: '#d6d7da',
+  street: '#a0a3a8',
+  main: '#e6d9a2',
+  secondary: '#c4c6ca',
+  lane: '#b4b7bc',
+  alley: '#a6a9ae',
+  stairs: '#a7abb1',
 };
 const PICKUP = '#2fbf71';
-const DROPOFF = '#3b82f6';
+const DROPOFF = '#3b8cf6';
+
+/** Promenade waves: black and white bands that ripple along the beach. */
+function mosaicLight(x: number, z: number): boolean {
+  return Math.sin(z * 2.1 + Math.sin(x * 0.55) * 2.4) > 0;
+}
+
+function surfaceColor(surface: Surface, x: number, z: number): Rgb {
+  switch (surface) {
+    case 'asphalt':
+      return z > AVENUE_Z_MIN && z < AVENUE_Z_MAX ? PALETTE.avenue : PALETTE.road;
+    case 'cobble':
+      return PALETTE.cobble;
+    case 'sidewalk':
+      return PALETTE.sidewalk;
+    case 'mosaic':
+      return mosaicLight(x, z) ? PALETTE.mosaicLight : PALETTE.mosaicDark;
+    case 'sand':
+      return PALETTE.sand;
+    case 'grass':
+      return PALETTE.park;
+    case 'lot':
+      return PALETTE.lot;
+  }
+}
 
 export class Minimap {
   private readonly element: HTMLDivElement;
@@ -66,7 +113,7 @@ export class Minimap {
   private readonly image: HTMLCanvasElement;
   private readonly spots: readonly DeliverySpot[];
   private readonly bounds: MinimapBounds;
-  private radius = NEAR_RADIUS;
+  private range = NEAR_RANGE;
 
   constructor(container: HTMLElement, data: MinimapData) {
     this.bounds = data.bounds;
@@ -83,6 +130,7 @@ export class Minimap {
     this.north.textContent = TEXT.north;
     const arrow = document.createElement('i');
     arrow.className = 'minimap-arrow';
+    arrow.style.top = `${BIKE_DOWN * 100}%`;
     this.element.append(this.canvas, arrow, this.north);
     container.append(this.element);
     this.image = paintMap(data);
@@ -99,38 +147,33 @@ export class Minimap {
     const rect = canvas.getBoundingClientRect();
     if (rect.width === 0) return;
     const ratio = Math.min(2, window.devicePixelRatio || 1);
-    const size = Math.round(rect.width * ratio);
-    if (canvas.width !== size) {
-      canvas.width = size;
-      canvas.height = size;
+    const width = Math.round(rect.width * ratio);
+    const height = Math.round(rect.height * ratio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
     }
 
-    const wanted =
-      NEAR_RADIUS + (FAR_RADIUS - NEAR_RADIUS) * Math.min(1, Math.abs(speed) / TOP_SPEED);
-    this.radius += (wanted - this.radius) * Math.min(1, dt * 1.5);
+    const wanted = NEAR_RANGE + (FAR_RANGE - NEAR_RANGE) * Math.min(1, Math.abs(speed) / TOP_SPEED);
+    this.range += (wanted - this.range) * Math.min(1, dt * 1.5);
 
-    // Map pixels to screen pixels, and the bike's spot in the map image. The image has
-    // +x to the left, like the view.
-    const scale = size / 2 / (this.radius * PIXELS_PER_METRE);
+    // Screen pixels per map-image pixel, and the bike's spot in the image.
+    const cy = height * BIKE_DOWN;
+    const scale = cy / (this.range * PIXELS_PER_METRE);
     const px = (this.bounds.x1 - x) * PIXELS_PER_METRE;
     const pz = (this.bounds.z1 - z) * PIXELS_PER_METRE;
-    // Facing heading h, the way ahead in the image is (-sin h, -cos h); turning the image
-    // clockwise by h brings it to straight up.
-    const angle = heading;
 
     context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, size, size);
+    context.fillStyle = `rgb(${PALETTE.deepWater.join(',')})`;
+    context.fillRect(0, 0, width, height);
     context.save();
-    context.beginPath();
-    context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-    context.clip();
-    context.fillStyle = WATER;
-    context.fillRect(0, 0, size, size);
-    context.translate(size / 2, size / 2);
-    context.rotate(angle);
+    context.translate(width / 2, cy);
+    // Facing heading h, the way ahead in the image is (-sin h, -cos h); turning the image
+    // clockwise by h brings it to straight up.
+    context.rotate(heading);
     context.scale(scale, scale);
-    // Only the part of the image that can show: a square round the bike.
-    const reach = this.radius * PIXELS_PER_METRE * 1.5;
+    // Only the part of the image that can show.
+    const reach = (Math.hypot(width, height) / scale) * 0.75;
     const sx = Math.max(0, px - reach);
     const sy = Math.max(0, pz - reach);
     const sw = Math.min(this.image.width, px + reach) - sx;
@@ -139,32 +182,46 @@ export class Minimap {
       context.drawImage(this.image, sx, sy, sw, sh, sx - px, sy - pz, sw, sh);
     }
 
-    // Delivery spots in range.
-    const icon = 5 / scale;
+    // Delivery spots as round blips, kept upright.
+    const blip = 6 / scale;
     for (const spot of this.spots) {
       const dx = (this.bounds.x1 - spot.x) * PIXELS_PER_METRE - px;
       const dz = (this.bounds.z1 - spot.z) * PIXELS_PER_METRE - pz;
-      if (Math.hypot(dx, dz) > this.radius * PIXELS_PER_METRE) continue;
+      if (Math.hypot(dx, dz) > reach) continue;
       context.fillStyle = spot.kind === 'pickup' ? PICKUP : DROPOFF;
-      context.strokeStyle = '#0b0d10';
-      context.lineWidth = 1.5 / scale;
+      context.strokeStyle = '#ffffff';
+      context.lineWidth = 1.6 / scale;
       context.beginPath();
-      if (spot.kind === 'pickup') context.rect(dx - icon, dz - icon, icon * 2, icon * 2);
-      else context.arc(dx, dz, icon, 0, Math.PI * 2);
+      context.arc(dx, dz, blip, 0, Math.PI * 2);
       context.fill();
       context.stroke();
+      context.fillStyle = '#ffffff';
+      context.beginPath();
+      if (spot.kind === 'pickup') {
+        context.rect(dx - blip * 0.4, dz - blip * 0.4, blip * 0.8, blip * 0.8);
+      } else {
+        context.arc(dx, dz, blip * 0.35, 0, Math.PI * 2);
+      }
+      context.fill();
     }
     context.restore();
 
-    // North sits on the rim, opposite the way the map is turned.
-    const rim = rect.width / 2 - 11;
-    const northX = rect.width / 2 + Math.sin(angle) * rim;
-    const northY = rect.height / 2 - Math.cos(angle) * rim;
-    this.north.style.transform = `translate(${northX}px, ${northY}px) translate(-50%, -50%)`;
+    // North rides the edge of the map where a line due north from the bike meets it.
+    const dirX = Math.sin(heading);
+    const dirY = -Math.cos(heading);
+    const inset = 10;
+    const bx = rect.width / 2;
+    const by = rect.height * BIKE_DOWN;
+    const tx =
+      dirX > 0 ? (rect.width - inset - bx) / dirX : dirX < 0 ? (inset - bx) / dirX : Infinity;
+    const ty =
+      dirY > 0 ? (rect.height - inset - by) / dirY : dirY < 0 ? (inset - by) / dirY : Infinity;
+    const t = Math.min(tx, ty);
+    this.north.style.transform = `translate(${bx + dirX * t}px, ${by + dirY * t}px) translate(-50%, -50%)`;
   }
 }
 
-/** Paint the whole world once: water, ground, buildings, then the roads on top. */
+/** Paint the whole world once: ground, buildings, roads, then road markings. */
 function paintMap(data: MinimapData): HTMLCanvasElement {
   const { bounds } = data;
   const width = Math.ceil((bounds.x1 - bounds.x0) * PIXELS_PER_METRE);
@@ -175,35 +232,62 @@ function paintMap(data: MinimapData): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
-  // Ground: water below sea level, land shaded a little by height.
-  const cols = Math.ceil((bounds.x1 - bounds.x0) / GROUND_SAMPLE);
-  const rows = Math.ceil((bounds.z1 - bounds.z0) / GROUND_SAMPLE);
-  const ground = ctx.createImageData(cols, rows);
+  // Terrain heights on a coarse grid, for water, height tint and relief shading.
+  const cols = Math.ceil((bounds.x1 - bounds.x0) / TERRAIN_SAMPLE) + 1;
+  const rows = Math.ceil((bounds.z1 - bounds.z0) / TERRAIN_SAMPLE) + 1;
+  const heights = new Float32Array(cols * rows);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const x = bounds.x1 - (c + 0.5) * GROUND_SAMPLE;
-      const z = bounds.z1 - (r + 0.5) * GROUND_SAMPLE;
-      const h = data.heightAt(x, z);
-      const i = (r * cols + c) * 4;
-      if (h < SEA_LEVEL + 0.2) {
-        ground.data[i] = 44;
-        ground.data[i + 1] = 111;
-        ground.data[i + 2] = 134;
-      } else {
-        const t = Math.min(1, Math.max(0, h / 150));
-        ground.data[i] = LAND_LOW[0] + (LAND_HIGH[0] - LAND_LOW[0]) * t;
-        ground.data[i + 1] = LAND_LOW[1] + (LAND_HIGH[1] - LAND_LOW[1]) * t;
-        ground.data[i + 2] = LAND_LOW[2] + (LAND_HIGH[2] - LAND_LOW[2]) * t;
-      }
-      ground.data[i + 3] = 255;
+      heights[r * cols + c] = data.heightAt(
+        bounds.x1 - c * TERRAIN_SAMPLE,
+        bounds.z1 - r * TERRAIN_SAMPLE,
+      );
     }
   }
-  const small = document.createElement('canvas');
-  small.width = cols;
-  small.height = rows;
-  small.getContext('2d')?.putImageData(ground, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(small, 0, 0, width, height);
+  const h = (c: number, r: number): number =>
+    heights[Math.min(rows - 1, Math.max(0, r)) * cols + Math.min(cols - 1, Math.max(0, c))] ?? 0;
+
+  const image = ctx.createImageData(width, height);
+  const out = image.data;
+  for (let py = 0; py < height; py++) {
+    const z = bounds.z1 - (py + 0.5) / PIXELS_PER_METRE;
+    const r = Math.round((bounds.z1 - z) / TERRAIN_SAMPLE);
+    for (let px = 0; px < width; px++) {
+      const x = bounds.x1 - (px + 0.5) / PIXELS_PER_METRE;
+      const c = Math.round((bounds.x1 - x) / TERRAIN_SAMPLE);
+      const ground = h(c, r);
+      let color: Rgb;
+      let shade = 1;
+      if (ground < SEA_LEVEL + 0.15) {
+        // Shallow water near the shore, deeper further out.
+        const t = Math.min(1, (SEA_LEVEL - ground) / 6);
+        color = [
+          PALETTE.water[0] + (PALETTE.deepWater[0] - PALETTE.water[0]) * t,
+          PALETTE.water[1] + (PALETTE.deepWater[1] - PALETTE.water[1]) * t,
+          PALETTE.water[2] + (PALETTE.deepWater[2] - PALETTE.water[2]) * t,
+        ];
+      } else if (Math.abs(x) < HALF && Math.abs(z) < HALF) {
+        color = surfaceColor(surfaceAt(x, z), x, z);
+      } else {
+        const t = Math.min(1, ground / 140);
+        color = [
+          PALETTE.land[0] + (PALETTE.highland[0] - PALETTE.land[0]) * t,
+          PALETTE.land[1] + (PALETTE.highland[1] - PALETTE.land[1]) * t,
+          PALETTE.land[2] + (PALETTE.highland[2] - PALETTE.land[2]) * t,
+        ];
+        if (ground < 1.5) color = PALETTE.sand;
+        // Relief: lit from the upper left of the map.
+        const slope = (h(c + 1, r + 1) - h(c - 1, r - 1)) / (TERRAIN_SAMPLE * 2.8);
+        shade = Math.max(0.6, Math.min(1.35, 1 + slope * 0.9));
+      }
+      const i = (py * width + px) * 4;
+      out[i] = color[0] * shade;
+      out[i + 1] = color[1] * shade;
+      out[i + 2] = color[2] * shade;
+      out[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
 
   // From here on draw in world metres: +x to the left, +z up.
   ctx.setTransform(
@@ -228,36 +312,67 @@ function paintMap(data: MinimapData): HTMLCanvasElement {
     ctx.closePath();
     ctx.fill();
   };
-  ctx.fillStyle = BUILDING;
-  for (const b of data.buildings) {
-    // City buildings are placed by the middle of their front wall.
-    const cx = b.x - Math.sin(b.yaw) * (b.depth / 2);
-    const cz = b.z - Math.cos(b.yaw) * (b.depth / 2);
-    footprint(cx, cz, b.yaw, b.width / 2, b.depth / 2);
-  }
-  ctx.fillStyle = HOUSE;
-  for (const h of data.houses) footprint(h.x, h.z, h.yaw, h.width / 2, h.depth / 2);
 
-  // Roads: a dark casing first, then the surface, stairs dashed.
+  // Hillside roads from the graph: paved edges first, then the surface.
+  const hillEdges = data.roads.edges.filter((edge) => edge.area !== 'city');
+  const trace = (points: readonly { x: number; z: number }[]): void => {
+    ctx.beginPath();
+    points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.z) : ctx.lineTo(p.x, p.z)));
+  };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  for (const pass of ['casing', 'surface'] as const) {
-    for (const edge of data.roads.edges) {
-      const stairs = edge.kind === 'stairs';
-      if (stairs && pass === 'casing') continue;
-      ctx.beginPath();
-      edge.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.z) : ctx.lineTo(p.x, p.z)));
-      if (pass === 'casing') {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = CASING;
-        ctx.lineWidth = Math.max(2.5, edge.width + 1.6);
-      } else {
-        ctx.setLineDash(stairs ? [1.2, 1] : []);
-        ctx.strokeStyle = ROAD_COLORS[edge.kind];
-        ctx.lineWidth = Math.max(stairs ? 1.2 : 1.8, stairs ? 1.4 : edge.width);
-      }
-      ctx.stroke();
-    }
+  for (const edge of hillEdges) {
+    if (edge.kind === 'stairs') continue;
+    trace(edge.points);
+    ctx.strokeStyle = APRON;
+    ctx.lineWidth = edge.width + 2.8;
+    ctx.stroke();
+  }
+
+  // Buildings: the city's, then the favela houses.
+  ctx.fillStyle = CITY_BUILDING;
+  for (const b of data.buildings) {
+    // City buildings are placed by the middle of their front wall.
+    footprint(
+      b.x - Math.sin(b.yaw) * (b.depth / 2),
+      b.z - Math.cos(b.yaw) * (b.depth / 2),
+      b.yaw,
+      b.width / 2,
+      b.depth / 2,
+    );
+  }
+  ctx.fillStyle = HOUSE;
+  for (const house of data.houses)
+    footprint(house.x, house.z, house.yaw, house.width / 2, house.depth / 2);
+
+  for (const edge of hillEdges) {
+    const stairs = edge.kind === 'stairs';
+    trace(edge.points);
+    ctx.setLineDash(stairs ? [1.4, 0.9] : []);
+    ctx.strokeStyle = ROAD_COLORS[edge.kind];
+    ctx.lineWidth = stairs ? 1.6 : edge.width;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // The seafront avenue's markings: double yellow down the middle, white lane lines.
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = LINE_YELLOW;
+  ctx.lineWidth = 0.7;
+  for (const offset of [-0.5, 0.5]) {
+    ctx.beginPath();
+    ctx.moveTo(-HALF, AVENUE_Z + offset);
+    ctx.lineTo(HALF, AVENUE_Z + offset);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#8f9196';
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([4, 4]);
+  for (const offset of [-3.75, 3.75]) {
+    ctx.beginPath();
+    ctx.moveTo(-HALF, AVENUE_Z + offset);
+    ctx.lineTo(HALF, AVENUE_Z + offset);
+    ctx.stroke();
   }
   ctx.setLineDash([]);
   return canvas;

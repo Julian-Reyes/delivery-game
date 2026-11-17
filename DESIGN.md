@@ -295,10 +295,16 @@ dead ends without a turning pad, edges the bike can't
 reach from the spawn, and edges it can enter but never leave. `route.ts` finds the shortest
 riding or walking route, for delivery distances and the waypoint later.
 
-**Minimap** (`ui/minimap.ts`), bottom left while riding: a round window on roads,
-buildings, water and delivery spots, turned so straight ahead is always up, with an N on
-the rim, zooming out from 70 m to 140 m radius with speed. The whole map is painted once
-into an offscreen canvas; each frame draws a rotated crop of it.
+**Minimap** (`ui/minimap.ts`), bottom left while riding, in the style of an open-world
+radar: a rounded rectangle, heading-up, the bike's white arrow below the middle so more
+of the road ahead shows, zooming out from 75 m to 150 m ahead with speed, an N riding the
+edge, and pickups and drop-offs as round blips. Inside the city the ground is painted
+pixel by pixel from `surfaceAt`, so every street has its true width: the 15 m four-lane
+seafront avenue in bright cream with its double yellow line and lane dashes, the 10 m side
+streets in grey with dark pavements, sand on the beach, the promenade's black and white
+waves, the park in green. Outside the city: water deepening offshore, muted land with
+relief shading, favela roads from the graph with paved edges, house footprints. Painted
+once into an offscreen canvas; each frame draws a rotated crop.
 
 **Handedness.** The world is right-handed with y up, so facing +z, +x is on your LEFT.
 The code calls +z north and +x east, which makes the world a mirror image of a real
