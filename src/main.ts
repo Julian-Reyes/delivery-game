@@ -1,5 +1,6 @@
 import { BikeAudio } from './audio/bikeAudio';
-import { ChaseCamera } from './bike/chaseCamera';
+import { CAMERA_VIEWS, ChaseCamera } from './bike/chaseCamera';
+import type { CameraView } from './bike/chaseCamera';
 import { Rider } from './bike/rider';
 import { BRAND } from './brand';
 import { DebugOverlay } from './core/debugOverlay';
@@ -13,6 +14,7 @@ import { KeyboardSource } from './input/keyboard';
 import { Physics } from './physics/physics';
 import { DebugMap } from './ui/debugMap';
 import { Minimap } from './ui/minimap';
+import { SettingsMenu } from './ui/settingsMenu';
 import { planBuildings } from './world/buildings';
 import { HALF, SPAWN, surfaceAt } from './world/layout';
 import { isRideable, nearestOnGraph, pointAlong } from './world/roads/graph';
@@ -27,6 +29,26 @@ import './style.css';
 function mapSeed(): number {
   const value = Number(new URLSearchParams(window.location.search).get('seed'));
   return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAP_SEED;
+}
+
+const VIEW_KEY = 'moto-entrega.cameraView';
+
+/** The camera view the player picked last time; storage can be missing or blocked. */
+function savedView(): CameraView {
+  try {
+    const value = window.localStorage.getItem(VIEW_KEY);
+    return CAMERA_VIEWS.find((view) => view === value) ?? 'far';
+  } catch {
+    return 'far';
+  }
+}
+
+function saveView(view: CameraView): void {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // Not remembered, which is fine.
+  }
 }
 
 function buildTitleCard(): HTMLElement {
@@ -127,7 +149,7 @@ async function boot(): Promise<void> {
   const hint = document.createElement('p');
   hint.className = 'hint';
   hint.textContent =
-    'W/S or ↑/↓ throttle and brake (hold S when stopped to back up) · A/D or ←/→ steer · R respawn · M map · ` debug' +
+    'W/S or ↑/↓ throttle and brake (hold S when stopped to back up) · A/D or ←/→ steer · R respawn · Esc settings · M map · ` debug' +
     (free ? ' · C free camera (Q/E height)' : '');
   hint.hidden = true;
 
@@ -146,6 +168,26 @@ async function boot(): Promise<void> {
     hint.hidden = false;
   };
   titleCard.addEventListener('pointerdown', startRiding);
+
+  const applyView = (view: CameraView): void => {
+    chase.setView(view);
+    rider.setFirstPerson(view === 'first');
+  };
+  applyView(savedView());
+  const settings = new SettingsMenu(
+    app,
+    chase.currentView,
+    (view) => {
+      applyView(view);
+      saveView(view);
+    },
+    () => {
+      settings.close();
+      audio.setPaused(false);
+    },
+  );
+  // Menu navigation from the riding controls, one step per press.
+  let previousAxes = { throttle: 0, brake: 0, steer: 0 };
 
   if (import.meta.env.DEV) {
     // Rides routes on its own: `await __game.autopilot.ride(x, z)` returns a report.
@@ -177,19 +219,35 @@ async function boot(): Promise<void> {
         world.setFog(!flying);
       }
       if (free && flying) free.update(dt, input.state);
-      if (input.wasPressed('confirm')) startRiding();
-      if (riding && input.wasPressed('respawn')) {
+      if (input.wasPressed('confirm') && !riding) startRiding();
+      if (riding && input.wasPressed('pause')) {
+        if (settings.isOpen) settings.close();
+        else settings.open();
+        audio.setPaused(settings.isOpen);
+      }
+      const axes = input.state;
+      if (settings.isOpen) {
+        settings.handle({
+          up: axes.throttle > 0.5 && previousAxes.throttle <= 0.5,
+          down: axes.brake > 0.5 && previousAxes.brake <= 0.5,
+          left: axes.steer < -0.5 && previousAxes.steer >= -0.5,
+          right: axes.steer > 0.5 && previousAxes.steer <= 0.5,
+          confirm: input.wasPressed('confirm'),
+        });
+      }
+      previousAxes = { throttle: axes.throttle, brake: axes.brake, steer: axes.steer };
+      if (riding && !settings.isOpen && input.wasPressed('respawn')) {
         rider.respawn();
         chase.snap();
       }
     },
     step(dt): void {
-      if (riding && !flying) rider.step(dt, input.state);
+      if (riding && !flying && !settings.isOpen) rider.step(dt, input.state);
     },
     render(alpha): void {
       rider.render(alpha);
       world.animate(frameDt);
-      chase.update(frameDt, rider.pose);
+      chase.update(frameDt, rider.pose, rider.eye);
       const camera = free && flying ? free.camera : chase.camera;
       const eye = camera.position;
       world.update(eye.x, eye.y, eye.z, rider.pose.x, rider.pose.y, rider.pose.z);

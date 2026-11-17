@@ -8,6 +8,7 @@ import {
   Group,
   Mesh,
   MeshLambertMaterial,
+  Object3D,
   Quaternion,
   SphereGeometry,
   TorusGeometry,
@@ -408,6 +409,13 @@ export class BikeModel {
   private readonly frontWheel: Mesh;
   private readonly rearWheel: Mesh;
   private readonly limbs = new Limbs(14);
+  private readonly helmet: Mesh;
+  /**
+   * The rider's eyes, for the first-person view: a camera placed here looks where the
+   * rider looks, leaning and pitching with the bike. Cameras look down their -z, so it is
+   * turned to face the bike's +z, tipped a little down towards the road.
+   */
+  readonly eye = new Object3D();
 
   // Scratch, so posing allocates nothing per frame.
   private readonly hip = new Vector3();
@@ -452,7 +460,10 @@ export class BikeModel {
       sphere(0.152, 0, 0.005, 0, JACKET, 0.25, 1.06, 1.11),
     ]);
     helmet.position.set(0, 1.68, 0.06);
-    this.object.add(helmet, this.limbs.mesh);
+    this.helmet = helmet;
+    this.eye.position.set(0, 1.64, -0.04);
+    this.eye.rotation.set(-0.28, Math.PI, 0, 'YXZ');
+    this.object.add(helmet, this.limbs.mesh, this.eye);
     this.limbs.setColors([
       JACKET,
       SKIN,
@@ -469,6 +480,11 @@ export class BikeModel {
       JACKET,
       GLOVES,
     ]);
+  }
+
+  /** In first person the camera sits inside the helmet, so hide it. */
+  setFirstPerson(firstPerson: boolean): void {
+    this.helmet.visible = !firstPerson;
   }
 
   update(pose: BikePose): void {

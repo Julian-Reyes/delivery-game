@@ -22,11 +22,11 @@ simple arcade handling from the step 2 sandbox, which they like the feel of.
 
 Step 5 so far: `bike/rider.ts` is a placeholder that keeps the sandbox handling and adds
 terrain following, steering that tightens when held (a tap or gentle turn uses the
-original 1.9 rad/s from 6 m/s; holding full lock ramps over 0.6 s to 2.5 rad/s from
-4.5 m/s with more lean, so the tightest circle drops from about 3.2 m to 1.8 m at walking
-pace), airtime off ramps and crests, sliding along walls, and backing up: hold
+original 1.9 rad/s from 6 m/s; holding full lock ramps over 0.35 s to 3.8 rad/s from
+3.5 m/s with more lean, about twice as sharp: at 46 km/h the circle drops from about 6.7 m
+to 3.4 m), airtime off ramps and crests, sliding along walls, and backing up: hold
 the brake at a standstill and after 0.35 s the rider paddles the bike backwards with their
-feet at 1.6 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
+feet at 2.1 m/s at most, steering slowly and reversed, stopping as soon as the brake is let
 go. It also publishes `telemetry` (speed, throttle, brake, airtime, landings, scraping)
 each step for the sound and, later, the cargo model.
 
@@ -307,6 +307,15 @@ streets in grey with dark pavements, sand on the beach, the promenade's black an
 waves, the park in green. Outside the city: water deepening offshore, muted land with
 relief shading, favela roads from the graph with paved edges, house footprints. Painted
 once into an offscreen canvas; each frame draws a rotated crop.
+
+**Camera views and the pause menu.** Esc (the pause action) pauses the game and opens a
+settings menu (`ui/settingsMenu.ts`) where the player picks one of three views: far chase
+(the original spring-arm camera), close chase (nearer and lower), and first person from
+the rider's eyes (an anchor in the bike model that leans and pitches with it; the helmet is
+hidden, the field of view widens to 75° and the near plane drops so the bars, mirrors and
+clocks show at the bottom). Mouse, keyboard and gamepad all work it; keyboard and gamepad
+through the input actions. The choice is remembered in local storage. The sound ducks while
+paused.
 
 **Handedness.** The world is right-handed with y up, so facing +z, +x is on your LEFT.
 The code calls +z north and +x east, which makes the world a mirror image of a real

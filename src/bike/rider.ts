@@ -1,4 +1,5 @@
 import { Group } from 'three';
+import type { Object3D } from 'three';
 import { BikeModel } from './bikeModel';
 import type { RawInput } from '../input/actions';
 import type { GroundHit, Physics } from '../physics/physics';
@@ -21,12 +22,12 @@ const MAX_SPEED = 28;
  * the spot.
  */
 const TURN_RATE = 1.9;
-const HELD_TURN_RATE = 2.5;
+const HELD_TURN_RATE = 3.8;
 const FULL_STEER_SPEED = 6;
-const HELD_FULL_STEER_SPEED = 4.5;
+const HELD_FULL_STEER_SPEED = 3.5;
 const MAX_LEAN = 0.55;
-const HELD_MAX_LEAN = 0.7;
-const HOLD_RAMP = 0.6;
+const HELD_MAX_LEAN = 0.8;
+const HOLD_RAMP = 0.35;
 /** Steering at least this hard counts as holding full lock. */
 const FULL_LOCK = 0.9;
 const GRAVITY = 22;
@@ -39,8 +40,8 @@ const SCRAPE_KEEP = 0.25;
  * Backing up: hold the brake at a standstill and the rider paddles the bike backwards
  * with their feet, at walking pace and no faster.
  */
-const REVERSE_SPEED = 1.6;
-const REVERSE_ACCEL = 2.2;
+const REVERSE_SPEED = 2.1;
+const REVERSE_ACCEL = 2.9;
 /** How long the brake is held at a standstill before the feet start paddling. */
 const REVERSE_DELAY = 0.35;
 /** Stopped means slower than this. */
@@ -139,6 +140,15 @@ export class Rider {
 
   get speedKmh(): number {
     return this.speed * 3.6;
+  }
+
+  /** Where the rider's eyes are, for the first-person camera. */
+  get eye(): Object3D {
+    return this.model.eye;
+  }
+
+  setFirstPerson(firstPerson: boolean): void {
+    this.model.setFirstPerson(firstPerson);
   }
 
   get airborne(): boolean {

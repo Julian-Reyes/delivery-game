@@ -194,6 +194,13 @@ export class BikeAudio {
     });
   }
 
+  /** Duck everything while the game is paused, and bring it back on resume. */
+  setPaused(paused: boolean): void {
+    const g = this.graph;
+    if (!g) return;
+    g.master.gain.setTargetAtTime(paused ? MASTER * 0.15 : MASTER, g.context.currentTime, 0.08);
+  }
+
   /**
    * Follow the bike. Call once per rendered frame. `cobbles` is true when the bike is on
    * a cobblestone street; `landing` is the strongest landing since the last frame.

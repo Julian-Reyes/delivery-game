@@ -1,11 +1,29 @@
 import { PerspectiveCamera } from 'three';
+import type { Object3D } from 'three';
 import type { Physics } from '../physics/physics';
 import type { Pose } from './rider';
 
-const DISTANCE = 7.5;
-const HEIGHT = 3.0;
-const FOCUS_HEIGHT = 1.3;
-const LOOK_AHEAD = 4;
+/** The three points of view: far behind, close behind, and through the rider's eyes. */
+export type CameraView = 'far' | 'near' | 'first';
+export const CAMERA_VIEWS: readonly CameraView[] = ['far', 'near', 'first'];
+
+interface ChaseSettings {
+  distance: number;
+  height: number;
+  focusHeight: number;
+  lookAhead: number;
+}
+
+const CHASE: Record<Exclude<CameraView, 'first'>, ChaseSettings> = {
+  far: { distance: 7.5, height: 3.0, focusHeight: 1.3, lookAhead: 4 },
+  near: { distance: 4.2, height: 2.0, focusHeight: 1.35, lookAhead: 3 },
+};
+/** First person sits close to the bars, so it needs a nearer near plane. */
+const NEAR_PLANE = 0.2;
+const FIRST_PERSON_NEAR_PLANE = 0.04;
+/** A wider view from the saddle, so the mirrors and bars show at the bottom. */
+const FIELD_OF_VIEW = 62;
+const FIRST_PERSON_FIELD_OF_VIEW = 75;
 /** Closest the camera will be pushed in when something is behind the rider. */
 const MIN_DISTANCE = 1.6;
 const WALL_MARGIN = 0.45;
@@ -16,19 +34,34 @@ function dampFactor(rate: number, dt: number): number {
 }
 
 /**
- * Third-person camera on a spring arm. It swings round behind the rider with a little lag,
- * and a ray from the rider to the camera shortens the arm before it can pass through a
- * building or dip under a hill.
+ * The rider camera. In the two chase views it hangs on a spring arm behind the rider,
+ * swinging round with a little lag, and a ray from the rider to the camera shortens the
+ * arm before it can pass through a building or dip under a hill. In first person it sits
+ * at the rider's eyes and leans and pitches with the bike.
  */
 export class ChaseCamera {
-  readonly camera = new PerspectiveCamera(62, 1, 0.2, 2000);
+  readonly camera = new PerspectiveCamera(FIELD_OF_VIEW, 1, NEAR_PLANE, 2000);
 
   private heading = 0;
   private y = 0;
-  private arm = DISTANCE;
+  private arm = CHASE.far.distance;
   private initialized = false;
+  private view: CameraView = 'far';
 
   constructor(private readonly physics: Physics) {}
+
+  get currentView(): CameraView {
+    return this.view;
+  }
+
+  setView(view: CameraView): void {
+    if (view === this.view) return;
+    this.view = view;
+    this.camera.near = view === 'first' ? FIRST_PERSON_NEAR_PLANE : NEAR_PLANE;
+    this.camera.fov = view === 'first' ? FIRST_PERSON_FIELD_OF_VIEW : FIELD_OF_VIEW;
+    this.camera.updateProjectionMatrix();
+    this.snap();
+  }
 
   setAspect(aspect: number): void {
     this.camera.aspect = aspect;
@@ -40,11 +73,19 @@ export class ChaseCamera {
     this.initialized = false;
   }
 
-  update(dt: number, pose: Pose): void {
+  /** Follow the rider. `eye` is the rider's eye anchor, used in first person. */
+  update(dt: number, pose: Pose, eye: Object3D): void {
+    if (this.view === 'first') {
+      eye.updateWorldMatrix(true, false);
+      eye.matrixWorld.decompose(this.camera.position, this.camera.quaternion, this.camera.scale);
+      this.camera.scale.set(1, 1, 1);
+      return;
+    }
+    const { distance, height, focusHeight, lookAhead } = CHASE[this.view];
     if (!this.initialized) {
       this.heading = pose.heading;
       this.y = pose.y;
-      this.arm = DISTANCE;
+      this.arm = distance;
       this.initialized = true;
     }
 
@@ -57,13 +98,13 @@ export class ChaseCamera {
     this.y += (pose.y - this.y) * dampFactor(9, dt);
 
     const focusX = pose.x;
-    const focusY = this.y + FOCUS_HEIGHT;
+    const focusY = this.y + focusHeight;
     const focusZ = pose.z;
 
     // Unit vector from the focus point back to where the camera wants to be.
-    const backX = -Math.sin(this.heading) * DISTANCE;
-    const backY = HEIGHT - FOCUS_HEIGHT;
-    const backZ = -Math.cos(this.heading) * DISTANCE;
+    const backX = -Math.sin(this.heading) * distance;
+    const backY = height - focusHeight;
+    const backZ = -Math.cos(this.heading) * distance;
     const length = Math.hypot(backX, backY, backZ);
     const dirX = backX / length;
     const dirY = backY / length;
@@ -92,9 +133,9 @@ export class ChaseCamera {
 
     this.camera.position.set(cameraX, cameraY, cameraZ);
     this.camera.lookAt(
-      pose.x + Math.sin(pose.heading) * LOOK_AHEAD,
-      this.y + FOCUS_HEIGHT - 0.1,
-      pose.z + Math.cos(pose.heading) * LOOK_AHEAD,
+      pose.x + Math.sin(pose.heading) * lookAhead,
+      this.y + focusHeight - 0.1,
+      pose.z + Math.cos(pose.heading) * lookAhead,
     );
   }
 }

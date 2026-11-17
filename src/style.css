@@ -237,3 +237,77 @@ body,
     sans-serif;
   text-align: center;
 }
+
+.settings-menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgb(10 14 20 / 55%);
+  z-index: 20;
+}
+
+.settings-menu[hidden] {
+  display: none;
+}
+
+.settings-panel {
+  width: min(100%, 420px);
+  padding: 1.4rem 1.5rem 1.1rem;
+  border-radius: 14px;
+  background: rgb(22 32 46 / 96%);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 55%);
+  text-align: center;
+}
+
+.settings-panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--sun);
+}
+
+.settings-label {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.settings-options {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.2rem;
+}
+
+.settings-panel button {
+  flex: 1;
+  padding: 0.6rem 0.4rem;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 10%);
+  color: var(--paper);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-panel button.selected {
+  background: var(--sea);
+  color: var(--ink);
+}
+
+.settings-panel button.focused {
+  border-color: var(--sun);
+}
+
+.settings-resume {
+  width: 100%;
+}
+
+.settings-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
